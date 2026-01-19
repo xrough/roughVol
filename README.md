@@ -153,3 +153,15 @@ All experiments are fully scriptable and configuration-driven.
 ```bash
 git clone https://github.com/jixh-KPZ-1020/Rough-Pricing.git
 ```
+
+---
+
+## How you use this on another PC
+
+After cloning:
+
+```bash
+git clone <your-repo>
+cd <your-repo>
+python3 scripts/setup.py
+

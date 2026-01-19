@@ -4,11 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roughvol"
-version = "0.0.0"
-description = "Rough volatility numerical methods (scaffold)"
+version = "0.1.0"
+description = "Research-grade rough volatility pricing framework"
+readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy", "scipy"]
+dependencies = [
+  "numpy",
+  "scipy",
+  "pandas",
+  "matplotlib",
+]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = ["slow: slow numerical tests"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "ruff",
+]
