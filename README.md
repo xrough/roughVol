@@ -8,8 +8,7 @@ This repository is a **research-grade Python framework** for derivative pricing 
 * Theoretical modeling
 * Computational efficiency
 
-This is **not** a toy pricer.
-It is designed to demonstrate how **real-world quantitative models** are built, analyzed, validated, and optimized.
+关于如何安装，请移至文档最后。
 
 ---
 
