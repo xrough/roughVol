@@ -1,118 +1,122 @@
-Rough Volatility Lab
+# Rough Volatility Lab
 
-Numerical Methods for Advanced Volatility Modeling in Python
+**Numerical Methods for Advanced Volatility Modeling in Python**
 
-This repository is a research-grade Python framework for derivative pricing under modern volatility models, with a focus on numerical methods, theoretical modeling, and computational efficiency.
+This repository is a **research-grade Python framework** for derivative pricing under modern volatility models, with a focus on:
 
-It is not a toy pricer.
-It is designed to demonstrate how real-world quant models are built, analyzed, validated, and optimized.
+* Numerical methods
+* Theoretical modeling
+* Computational efficiency
 
-What This Project Does
+This is **not** a toy pricer.
+It is designed to demonstrate how **real-world quantitative models** are built, analyzed, validated, and optimized.
+
+---
+
+## What This Project Does
 
 This project implements and studies three advanced extensions to standard volatility models:
 
-Markovian approximations of rough volatility
+### 1. Markovian Approximations of Rough Volatility
+
 Turning non-Markovian rough models into finite-dimensional, tractable systems.
 
-Multilevel Monte Carlo (MLMC)
+### 2. Multilevel Monte Carlo (MLMC)
+
 Reducing the computational cost of Monte Carlo pricing while controlling error.
 
-Rough Heston pricing via Fourier methods
+### 3. Rough Heston Pricing via Fourier Methods
+
 Using fractional dynamics and fast transform-based pricing instead of brute-force simulation.
 
-All methods are validated through convergence studies, performance benchmarks, and reproducible experiments.
+All methods are validated through **convergence studies**, **performance benchmarks**, and **reproducible experiments**.
 
-Why This Project Exists
+---
+
+## Why This Project Exists
 
 Classic models like Black–Scholes and Heston are computationally convenient but empirically weak.
 Rough volatility models are empirically strong but numerically difficult.
 
 This project explores how to make modern models usable in practice by addressing:
 
-Computational cost
+* Computational cost
+* Numerical stability
+* Approximation error
+* Algorithmic complexity
+* Reproducibility
 
-Numerical stability
+---
 
-Approximation error
+## Core Features
 
-Algorithmic complexity
+### Models
 
-Reproducibility
+* Black–Scholes (baseline)
+* Heston
+* Rough Bergomi (Monte Carlo)
+* Rough Heston (transform-based)
+* Markovian-lifted rough models
 
-Core Features
-Models
+### Pricing Engines
 
-Black–Scholes (baseline)
+* Standard Monte Carlo
+* Multilevel Monte Carlo (MLMC)
+* Fourier/COS pricing
 
-Heston
+### Instruments
 
-Rough Bergomi (Monte Carlo)
+* Vanilla European options (primary focus)
+* Path-dependent options (optional extensions)
 
-Rough Heston (transform-based)
+### Analytics
 
-Markovian-lifted rough models
+* Implied volatility
+* Greeks
+* Variance reduction
+* Classical calibration (non-ML)
 
-Pricing Engines
+---
 
-Standard Monte Carlo
+## Key Contributions
 
-Multilevel Monte Carlo (MLMC)
-
-Fourier/COS pricing
-
-Instruments
-
-Vanilla European options (primary focus)
-
-Path-dependent options (optional extensions)
-
-Analytics
-
-Implied volatility
-
-Greeks
-
-Variance reduction
-
-Classical calibration (non-ML)
-
-Key Contributions
-
-1. Markovian Lift of Rough Volatility
+### 1. Markovian Lift of Rough Volatility
 
 Transforms rough, non-Markovian models into finite-dimensional systems that are:
 
-Faster to simulate
+* Faster to simulate
+* Easier to calibrate
+* Compatible with PDE-based methods
 
-Easier to calibrate
+Includes full **accuracy vs speed tradeoff analysis**.
 
-Compatible with PDE-based methods
+---
 
-Includes full accuracy vs speed tradeoff analysis.
-
-2. Multilevel Monte Carlo (MLMC)
+### 2. Multilevel Monte Carlo (MLMC)
 
 Implements MLMC for rough volatility pricing, including:
 
-Level coupling
+* Level coupling
+* Adaptive sampling
+* Bias/variance control
 
-Adaptive sampling
+Demonstrates **real complexity reduction** compared to naive Monte Carlo.
 
-Bias/variance control
+---
 
-Demonstrates real complexity reduction compared to naive Monte Carlo.
-
-3. Rough Heston with Transform Pricing
+### 3. Rough Heston with Transform Pricing
 
 Implements a semi-analytic pricing route for rough Heston:
 
-Fractional dynamics solvers
+* Fractional dynamics solvers
+* Fourier-based pricing (COS method)
+* Stability and convergence analysis
 
-Fourier-based pricing (COS method)
+---
 
-Stability and convergence analysis
+## Repository Structure
 
-Repository Structure
+```
 rough-volatility-lab/
   src/roughvol/
     models/
@@ -125,79 +129,27 @@ rough-volatility-lab/
   tests/
   docs/
   notebooks/
+```
 
-Reproducible Experiments
+---
 
-This project emphasizes numerical credibility.
+## Reproducible Experiments
+
+This project emphasizes **numerical credibility**.
 
 Key experiments:
 
-MLMC vs standard Monte Carlo cost comparison
-
-Markovian lift accuracy vs number of factors
-
-Rough Heston solver stability and convergence
-
-Implied volatility surface generation
+* MLMC vs standard Monte Carlo cost comparison
+* Markovian lift accuracy vs number of factors
+* Rough Heston solver stability and convergence
+* Implied volatility surface generation
 
 All experiments are fully scriptable and configuration-driven.
 
-Installation
+---
+
+## Installation
+
+```bash
 git clone https://github.com/jixh-KPZ-1020/Rough-Pricing.git
-cd rough-volatility-lab
-pip install -e .
-
-Example Commands
-
-Run MLMC benchmark:
-
-python -m roughvol.experiments.run_mlmc_complexity
-
-
-Run Markovian lift study:
-
-python -m roughvol.experiments.run_lifted_approx
-
-
-Generate a volatility surface:
-
-python -m roughvol.experiments.run_surface
-
-Testing
-pytest
-
-
-For slower numerical regression tests:
-
-pytest -m slow
-
-Design Philosophy
-
-Numerical correctness over shortcuts
-
-Explicit error analysis
-
-Modular architecture
-
-Reproducible research
-
-Clear separation between models, solvers, and experiments
-
-Roadmap
-
-Planned extensions:
-
-PDE solvers in lifted state space
-
-Rough local volatility models
-
-American and barrier options
-
-Multidimensional rough models
-
-XVA-style adjustments
-
-Disclaimer
-
-This is a research and educational project.
-It is not intended for live trading use.
+```
