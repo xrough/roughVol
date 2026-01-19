@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roughvol"
+version = "0.0.0"
+description = "Rough volatility numerical methods (scaffold)"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: slow numerical tests"]
