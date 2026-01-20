@@ -19,7 +19,7 @@ def brownian_increments(
     n_paths: int,
     n_steps: int,
     dt: float,
-    rng: np.random.Generator,
+    rng: np.random.Generator, #将rng作为input是为了统一seed，保持随机生成一致.
 ) -> ArrayF:
     '''Generate Brownian increments dW ~ Normal(0, dt).
 

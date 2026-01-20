@@ -20,7 +20,7 @@ class VanillaOption:
     is_call: bool = True
 
     def payoff(self, spot_T: ArrayF) -> ArrayF: # self: option哑变量
-        spot_T = np.asarray(spot_T, dtype=float) # 向量化
+        spot_T = np.asarray(spot_T, dtype=float) # 向量化 -> 数值稳定
         if spot_T.ndim != 1:
             raise ValueError("spot_T must be a 1D array of terminal spot values.")
         if self.is_call:
