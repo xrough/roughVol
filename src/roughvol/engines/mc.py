@@ -33,21 +33,21 @@ class MonteCarloEngine:
         )
 
         # 3) terminal spots (European payoff)
-        spot_T = paths[:, -1]
+        spot_T = paths[:, -1] #-1指倒数第一个
 
-        # 4) compute pathwise payoffs using the instrument
-        payoffs = instrument.payoff(spot_T)
+        # 4) compute pathwise payoffs using the instrument 
+        payoffs = instrument.payoff(spot_T) # 不需要明确class 
 
         # 5) discount to time 0
         # For now assume model exposes constant risk-free rate as attribute `rate`
-        r = float(getattr(model, "rate", 0.0))
+        r = float(getattr(model, "rate", 0.0)) # getattr是自带的函数，返回model.rate若存在，反之返回0.0
         disc = np.exp(-r * instrument.maturity)
 
-        discounted = disc * payoffs
+        discounted = disc * payoffs # 折损
 
         # 6) estimator: mean and standard error
         price = float(discounted.mean())
-        stderr = float(discounted.std(ddof=1) / np.sqrt(self.n_paths))
+        stderr = float(discounted.std(ddof=1) / np.sqrt(self.n_paths)) # .std(ddof=1): sample standard deviation
 
         return PriceResult(
             price=price,
