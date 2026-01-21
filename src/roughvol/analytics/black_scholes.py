@@ -7,7 +7,7 @@ assuming lognormal asset prices with constant volatility.
 from __future__ import annotations
 
 import math
-from scipy.stats import norm
+from scipy.stats import norm # 正太
 
 def bs_price(*, spot: float, strike: float, maturity: float, rate: float, div: float, vol: float, is_call: bool) -> float:
     '''
