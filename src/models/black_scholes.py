@@ -21,7 +21,7 @@ class BlackScholesModel:
     rate: float # risk free rate
     div: float # dividend
     vol: float # constant vol
-    def simulate_paths(
+    def simulate_paths( #this is a method, which is just a function within a class.
         self,
         *,
         n_paths: int,
