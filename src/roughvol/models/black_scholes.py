@@ -1,5 +1,5 @@
 '''
-
+Black Scholes模型，包含simulate_paths这个method，输出pricing path的数值模拟。
 '''
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ from roughvol.sim.BM import brownian_increments # generate paths of BMs with giv
 from roughvol.types import ArrayF
 
 '''
-参数self有些神奇,此处指代包含simulate_paths的class,具体实用时先定义BlackScholesModel,如model=BlackScholesModel(...),
-然后通过paths = model.simulate_paths(...)调用.
+参数self有些神奇，此处指代包含simulate_paths的class，具体实用时先定义BlackScholesModel，如model=BlackScholesModel(...),
+然后通过paths = model.simulate_paths(...)调用。
 '''
 
 @dataclass(frozen=True)
