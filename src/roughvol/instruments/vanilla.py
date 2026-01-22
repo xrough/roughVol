@@ -16,7 +16,7 @@ class VanillaOption:
     European vanilla option (call or put).
     '''
     strike: float
-    maturity: float
+    maturity: float # maturity should belong to the derivative instead of the asset.
     is_call: bool = True
 
     def payoff(self, spot_T: ArrayF) -> ArrayF: # self: option哑变量

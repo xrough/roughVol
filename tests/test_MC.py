@@ -1,17 +1,13 @@
 '''
 Tests for the MC engine.
 '''
-
 import numpy as np
-
 from roughvol.engines.mc import MonteCarloEngine
 from roughvol.types import PriceResult
-
 # Adjust these imports to your actual module paths:
-from roughvol.models.black_scholes import GBM_Model
+from roughvol.models.GBM_model import GBM_Model
 from roughvol.instruments.vanilla import VanillaOption
-from roughvol.analytics.black_scholes import bs_price # have to use the deterministic BS formula! 
-
+from roughvol.analytics.black_scholes_formula  import bs_price # have to use the deterministic BS formula! 
 '''
 以下是seed可重复性测试函数，统计量sanity check等模型的测试函数。
 '''
