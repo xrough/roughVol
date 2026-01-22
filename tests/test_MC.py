@@ -1,105 +1,98 @@
 '''
-A robustness check of the MC engine.
+Tests for the MC engine.
 '''
 
 import numpy as np
-from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
 
-@dataclass
-class MCResult:
-    price: float
-    stderr: float
-    ci95: Tuple[float, float] # 95%置信区间
-    payoff_mean: float
-    payoff_std: float
-    n_paths: int
-    seed: Optional[int] 
+from roughvol.engines.mc import MonteCarloEngine
+from roughvol.types import PriceResult
 
-def mc_price_european_gbm(
-    S0: float,
-    K: float,
-    T: float,
-    r: float,
-    sigma: float,
-    payoff_fn: Callable[[np.ndarray, float], np.ndarray], # 这里的callable是代表输入是一个函数，这里相比于直接import而言很方便的一点是这个函数的接入就很自由。
-    n_paths: int = 200_000,
-    seed: Optional[int] = 123, # 与 seed: int | None 同含义
-) -> MCResult:
-    
-    '''
-     Risk-neutral GBM terminal simulation:
-      S_T = S0 * exp((r - 0.5*sigma^2)T + sigma*sqrt(T)*Z)
-    Returns discounted MC estimator + standard error and 95% CI.
+# Adjust these imports to your actual module paths:
+from roughvol.models.black_scholes import BlackScholesModel
+from roughvol.instruments.vanilla import VanillaOption
+from roughvol.analytics.black_scholes import bs_price # have to use the deterministic BS formula! 
 
-    payoff_fn signature: payoff_fn(ST: np.ndarray, K: float) -> np.ndarray
-    '''
+'''
+以下是seed可重复性测试函数，统计量sanity check等模型的测试函数。
+'''
 
-    # --- Edge cases / guards ---
-    if n_paths <= 1:
-        raise ValueError("n_paths must be > 1")
+def test_reproducibility_same_seed():
+    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
 
-    if T < 0:
-        raise ValueError("T must be non-negative")
+    e1 = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
+    e2 = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
 
-    if sigma < 0:
-        raise ValueError("sigma must be non-negative")
+    r1 = e1.price(model=model, instrument=inst)
+    r2 = e2.price(model=model, instrument=inst)
 
-    # If T == 0: option value is intrinsic (discount factor = 1)
-    if T == 0:
-        ST = np.array([S0], dtype=float) # np.array([]) 向量化了这个scalar，[]把S0转化成list。
-        payoff = payoff_fn(ST, K)[0] # payout should be dimension tolerant.
-        price = float(payoff)
-        return MCResult(
-            price=price,
-            stderr=0.0,
-            ci95=(price, price),
-            payoff_mean=price,
-            payoff_std=0.0,
-            n_paths=1,
-            seed=seed,
-        )
+    assert r1.price == r2.price
+    assert r1.stderr == r2.stderr
+    assert r1.ci95 == r2.ci95
 
-    # If sigma == 0: deterministic under RN: S_T = S0 * exp(rT)
-    if sigma == 0:
-        ST_det = S0 * np.exp(r * T)
-        payoff = float(payoff_fn(np.array([ST_det]), K)[0])
-        price = float(np.exp(-r * T) * payoff)
-        return MCResult(
-            price=price,
-            stderr=0.0,
-            ci95=(price, price),
-            payoff_mean=float(payoff),
-            payoff_std=0.0,
-            n_paths=1,
-            seed=seed,
-        )
 
-    # --- RNG (reproducible) ---
-    rng = np.random.default_rng(seed)
-    Z = rng.standard_normal(n_paths)
+def test_ci_and_stderr_sanity():
+    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
+    eng = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
 
-    # --- Vectorized terminal simulation ---
-    drift = (r - 0.5 * sigma * sigma) * T
-    vol = sigma * np.sqrt(T)
-    ST = S0 * np.exp(drift + vol * Z)
+    res = eng.price(model=model, instrument=inst)
+    assert isinstance(res, PriceResult)
+    assert res.stderr > 0.0
+    assert res.ci95[0] < res.price < res.ci95[1]
 
-    payoff = payoff_fn(ST, K)  # vector of payoffs
-    disc = np.exp(-r * T)
-    disc_payoff = disc * payoff
 
-    # --- Estimator and diagnostics ---
-    price = float(disc_payoff.mean())
-    payoff_std = float(disc_payoff.std(ddof=1))
-    stderr = payoff_std / np.sqrt(n_paths)
-    ci95 = (price - 1.96 * stderr, price + 1.96 * stderr)
+def test_T0_is_intrinsic_call():
+    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
 
-    return MCResult(
-        price=price,
-        stderr=float(stderr),
-        ci95=(float(ci95[0]), float(ci95[1])),
-        payoff_mean=float(payoff.mean()),
-        payoff_std=float(payoff_std),
-        n_paths=int(n_paths),
-        seed=seed,
+    inst_itm = VanillaOption(strike=90.0, maturity=0.0, is_call=True)
+    inst_otm = VanillaOption(strike=110.0, maturity=0.0, is_call=True)
+
+    eng = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
+
+    r_itm = eng.price(model=model, instrument=inst_itm)
+    r_otm = eng.price(model=model, instrument=inst_otm)
+
+    assert r_itm.price == 10.0
+    assert r_itm.stderr == 0.0
+    assert r_itm.ci95 == (10.0, 10.0)
+
+    assert r_otm.price == 0.0
+    assert r_otm.stderr == 0.0
+    assert r_otm.ci95 == (0.0, 0.0)
+
+
+def test_convergence_stderr_shrinks():
+    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
+
+    Ns = [2_000, 10_000, 50_000, 200_000]
+    stderrs = []
+    for N in Ns:
+        eng = MonteCarloEngine(n_paths=N, n_steps=200, seed=123)
+        stderrs.append(eng.price(model=model, instrument=inst).stderr)
+
+    # Not strictly monotone due to randomness, but should trend down strongly.
+    assert stderrs[-1] < stderrs[0]
+
+
+def test_bs_price_inside_mc_ci_optional():
+    """
+    Optional but recommended: Black–Scholes benchmark inside MC CI.
+    If your repo does not expose bs_price_vanilla, you can delete this test.
+    """
+    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
+    eng = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
+
+    mc = eng.price(model=model, instrument=inst)
+    bs = bs_price_vanilla(
+        spot0=model.spot0,
+        strike=inst.strike,
+        maturity=inst.maturity,
+        rate=model.rate,
+        vol=model.vol,
+        is_call=inst.is_call,
     )
+
+    assert mc.ci95[0] <= bs <= mc.ci95[1]
