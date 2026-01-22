@@ -1,3 +1,6 @@
+'''
+第二代引擎，加入antithetic取样的选择，以及SeedSequence。
+'''
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,20 +20,21 @@ class MonteCarloEngineV2:
     n_paths: int = 200_000
     n_steps: int = 200
     seed: int | None = 0
-    antithetic: bool = False # 现在的引擎可选antithetic或者原始的mc。
-   
+    antithetic: bool = True # 现在的引擎可选antithetic或者原始的mc。
+    
+    # SeedSequence是一方面保证需要重复实验时提供相同的seed，另一方面又可以提供完全独立的随机取样。
     def _make_rng(self) -> np.random.Generator:
         if self.seed is None:
             return np.random.default_rng()
         return np.random.default_rng(np.random.SeedSequence(self.seed))
-
-    # SeedSequence是一方面保证需要重复实验时提供相同的seed，另一方面又可以提供完全独立的随机取样。
+    
     def price(self, *, model: PathModel, instrument: Instrument) -> PriceResult:
         rng = self._make_rng()
 
         # If model supports antithetic and user requested it, use it.
         # antithetic的含义是在随机取样的过程中同时去随机数的本身和其相反数，当intrument函数是单调的时候会减小误差。
-        if self.antithetic and isinstance(model, AntitheticPathModel):
+        if self.antithetic:
+            print("[MC] Using antithetic variates.")
             paths = model.simulate_paths_antithetic(
                 n_paths=self.n_paths,
                 n_steps=self.n_steps,
@@ -38,6 +42,7 @@ class MonteCarloEngineV2:
                 rng=rng,
             )
         else:
+            print("[MC] WARNING: Antithetic requested, but model does not support it. Falling back to minimal simulation.")
             paths = model.simulate_paths(
                 n_paths=self.n_paths,
                 n_steps=self.n_steps,

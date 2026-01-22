@@ -5,7 +5,8 @@ import numpy as np
 
 from roughvol.models.GBM_model import GBM_Model
 from roughvol.instruments.vanilla import VanillaOption
-from roughvol.engines.mc import MonteCarloEngine
+from roughvol.engines.mc_v2 import MonteCarloEngineV2 # older engine: from roughvol.engines.mc import MonteCarloEngine
+
 from roughvol.analytics.black_scholes_formula import implied_vol
 
 '''
@@ -65,7 +66,7 @@ def main():
     # 输入商品模型
     model = GBM_Model(spot0=args.spot, rate=args.rate, div=args.div, vol=args.vol) 
     # 输入随机引擎
-    engine = MonteCarloEngine(n_paths=args.n_paths, n_steps=args.n_steps, seed=args.seed)
+    engine = MonteCarloEngineV2(n_paths=args.n_paths, n_steps=args.n_steps, seed=args.seed, antithetic=True)
 
     strikes = get_user_strikes()
 
