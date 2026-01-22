@@ -17,30 +17,31 @@ ArrayF = np.ndarray #简写
 class PriceResult:
     """Standard output container for pricing engines."""
     price: float
-    stderr: float #MC标准误差
+    stderr: float # MC标准误差
+    ci95: tuple # MC标准误差
     n_paths: int
     n_steps: int
     seed: int | None = None
 
 
 @runtime_checkable
-class Instrument(Protocol):
-    """Contract: an instrument defines payoff from terminal spot values."""
+class Instrument(Protocol): # Protocol规定class必须要满足的条件，但可加入更多。
+    '''Contract: an instrument defines payoff from terminal spot values.'''
 
     maturity: float  #结算时间
 
     def payoff(self, spot_T: ArrayF) -> ArrayF:
-        """Return payoff for each terminal spot in `spot_T`.
+        '''Return payoff for each terminal spot in `spot_T`.
 
         spot_T: shape (n_paths,)
-        returns: shape (n_paths,)
-        """
+        returns: shape (n_paths,)'''
+        
         ...
 
 
 @runtime_checkable
 class PathModel(Protocol):
-    """Contract: a model can simulate spot paths on a uniform time grid."""
+    '''Contract: a model can simulate spot paths on a uniform time grid.'''
 
     def simulate_paths(
         self,
@@ -50,8 +51,8 @@ class PathModel(Protocol):
         maturity: float,
         rng: np.random.Generator, # 随机生成子
     ) -> ArrayF:
-        """Return spot paths including S0.
-
+        '''
+        Return spot paths including S0.
         returns shape (n_paths, n_steps + 1)
-        """
+        '''
         ...

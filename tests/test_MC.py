@@ -8,7 +8,7 @@ from roughvol.engines.mc import MonteCarloEngine
 from roughvol.types import PriceResult
 
 # Adjust these imports to your actual module paths:
-from roughvol.models.black_scholes import BlackScholesModel
+from roughvol.models.black_scholes import GBM_Model
 from roughvol.instruments.vanilla import VanillaOption
 from roughvol.analytics.black_scholes import bs_price # have to use the deterministic BS formula! 
 
@@ -17,8 +17,8 @@ from roughvol.analytics.black_scholes import bs_price # have to use the determin
 '''
 
 def test_reproducibility_same_seed():
-    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
-    inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
+    model = GBM_Model(spot0=100.0, rate=0.05, vol=0.2, div = 0)
+    inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True) # instrument，衍生品类型。
 
     e1 = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
     e2 = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
@@ -32,18 +32,14 @@ def test_reproducibility_same_seed():
 
 
 def test_ci_and_stderr_sanity():
-    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    model = GBM_Model(spot0=100.0, rate=0.05, vol=0.2, div = 0)
     inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
     eng = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
-
     res = eng.price(model=model, instrument=inst)
     assert isinstance(res, PriceResult)
     assert res.stderr > 0.0
     assert res.ci95[0] < res.price < res.ci95[1]
-
-
-def test_T0_is_intrinsic_call():
-    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    model = GBM_Model(spot0=100.0, rate=0.05, vol=0.2, div = 0)
 
     inst_itm = VanillaOption(strike=90.0, maturity=0.0, is_call=True)
     inst_otm = VanillaOption(strike=110.0, maturity=0.0, is_call=True)
@@ -63,7 +59,7 @@ def test_T0_is_intrinsic_call():
 
 
 def test_convergence_stderr_shrinks():
-    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    model = GBM_Model(spot0=100.0, rate=0.05, vol=0.2, div = 0)
     inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
 
     Ns = [2_000, 10_000, 50_000, 200_000]
@@ -79,18 +75,18 @@ def test_convergence_stderr_shrinks():
 def test_bs_price_inside_mc_ci_optional():
     """
     Optional but recommended: Black–Scholes benchmark inside MC CI.
-    If your repo does not expose bs_price_vanilla, you can delete this test.
     """
-    model = BlackScholesModel(spot0=100.0, rate=0.05, vol=0.2)
+    model = GBM_Model(spot0=100.0, rate=0.05, vol=0.2, div = 0)
     inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
     eng = MonteCarloEngine(n_paths=200_000, n_steps=200, seed=123)
 
     mc = eng.price(model=model, instrument=inst)
-    bs = bs_price_vanilla(
-        spot0=model.spot0,
+    bs = bs_price(
+        spot=model.spot0,
         strike=inst.strike,
         maturity=inst.maturity,
         rate=model.rate,
+        div=model.div,
         vol=model.vol,
         is_call=inst.is_call,
     )

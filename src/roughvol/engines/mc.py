@@ -6,7 +6,7 @@ import numpy as np
 from roughvol.types import Instrument, PathModel, PriceResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True) # 使得包含的数据不能更改。
 class MonteCarloEngine:
     '''
     Monte Carlo pricer for instruments whose payoff depends on terminal spot S_T.
@@ -19,6 +19,11 @@ class MonteCarloEngine:
     n_paths: int = 200_000
     n_steps: int = 200
     seed: int | None = 0
+    
+    '''
+    在Type中我们通过Protocol规定了一个PathModel必须具有的属性，所以进入引擎的model必须满足这些基本条件。
+    在这里就是它需要一个simulate_paths函数。注意：函数名称必须一致！
+    '''
 
     def price(self, *, model: PathModel, instrument: Instrument) -> PriceResult:
         # 1) RNG lives in the engine so runs are reproducible by seed
@@ -48,6 +53,7 @@ class MonteCarloEngine:
         # 6) estimator: mean and standard error
         price = float(discounted.mean())
         stderr = float(discounted.std(ddof=1) / np.sqrt(self.n_paths)) # .std(ddof=1): sample standard deviation
+        ci95 = ((price - 1.96 * stderr, price + 1.96 * stderr))
 
         return PriceResult(
             price=price,
@@ -55,4 +61,5 @@ class MonteCarloEngine:
             n_paths=self.n_paths,
             n_steps=self.n_steps,
             seed=self.seed,
+            ci95=ci95
         )

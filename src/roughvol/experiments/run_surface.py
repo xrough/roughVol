@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse # argparse lets a Python script accept parameters from the command line in a clean, robust, and standard way.
 import numpy as np
 
-from roughvol.models.black_scholes import BlackScholesModel
+from roughvol.models.black_scholes import GBM_Model
 from roughvol.instruments.vanilla import VanillaOption
 from roughvol.engines.mc import MonteCarloEngine
 from roughvol.analytics.black_scholes import implied_vol
@@ -61,8 +61,10 @@ def main():
     ap.add_argument("--n_steps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
-
-    model = BlackScholesModel(spot0=args.spot, rate=args.rate, div=args.div, vol=args.vol)
+    
+    # 输入商品模型
+    model = GBM_Model(spot0=args.spot, rate=args.rate, div=args.div, vol=args.vol) 
+    # 输入随机引擎
     engine = MonteCarloEngine(n_paths=args.n_paths, n_steps=args.n_steps, seed=args.seed)
 
     strikes = get_user_strikes()

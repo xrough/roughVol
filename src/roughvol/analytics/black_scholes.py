@@ -1,5 +1,5 @@
 '''
-Black-Scholes的分析模型，包含一个bs公式函数和一个vol的计算函数，由单调性寻找vol的预估值。
+Black-Scholes的分析模型，deterministic，包含一个bs公式函数和一个vol的计算函数，由单调性寻找vol的预估值。作为MC的benchmark。
 The Black–Scholes formula prices a European option as the discounted expected payoff at maturity, 
 assuming lognormal asset prices with constant volatility.
 '''
