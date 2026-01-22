@@ -56,3 +56,20 @@ class PathModel(Protocol):
         returns shape (n_paths, n_steps + 1)
         '''
         ...
+
+@runtime_checkable
+# AntitheticPathModel是PathModel，同时还多一个simulate_paths_antithetic()。
+class AntitheticPathModel(PathModel, Protocol): 
+    '''
+    Optional capability: model can simulate antithetic paths in one call.
+    The model guarantees paths are produced using paired (Z, -Z) construction.
+    '''
+    def simulate_paths_antithetic(
+        self,
+        *,
+        n_paths: int,
+        n_steps: int,
+        maturity: float,
+        rng: np.random.Generator,
+    ) -> ArrayF:
+        ...
