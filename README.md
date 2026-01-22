@@ -1,14 +1,25 @@
-# Rough Volatility Lab
+# Stochastic and Rough Volatility Lab
 
 **Numerical Methods for Advanced Volatility Modeling in Python**
 
-This repository is a **research-grade Python framework** for derivative pricing under modern volatility models, with a focus on:
+This repository is a **research-grade Python framework** for derivative pricing under modern volatility models.
 
-* Numerical methods
-* Theoretical modeling
-* Computational efficiency
+---
 
-关于如何安装，请移至文档最后。
+## Installation
+
+```bash
+git clone https://github.com/jixh-KPZ-1020/Rough-Pricing.git
+```
+
+## Venv
+
+After cloning:
+
+```bash
+git clone <your-repo>
+cd <your-repo>
+python3 scripts/setup.py
 
 ---
 
@@ -147,20 +158,5 @@ All experiments are fully scriptable and configuration-driven.
 
 ---
 
-## Installation
 
-```bash
-git clone https://github.com/jixh-KPZ-1020/Rough-Pricing.git
-```
-
----
-
-## How you use this on another PC
-
-After cloning:
-
-```bash
-git clone <your-repo>
-cd <your-repo>
-python3 scripts/setup.py
 
