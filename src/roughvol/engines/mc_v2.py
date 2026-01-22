@@ -6,7 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from roughvol.types import Instrument, PathModel, PriceResult, AntitheticPathModel
+from roughvol.types import Instrument, PathModel, PriceResult
+from roughvol.sim.BM import brownian_increments, brownian_increments_antithetic
 
 
 @dataclass(frozen=True)
@@ -22,51 +23,95 @@ class MonteCarloEngineV2:
     seed: int | None = 0
     antithetic: bool = True # 现在的引擎可选antithetic或者原始的mc。
     
-    # SeedSequence是一方面保证需要重复实验时提供相同的seed，另一方面又可以提供完全独立的随机取样。
+    # 确认随机生成seed
     def _make_rng(self) -> np.random.Generator:
         if self.seed is None:
             return np.random.default_rng()
         return np.random.default_rng(np.random.SeedSequence(self.seed))
-    
-    def price(self, *, model: PathModel, instrument: Instrument) -> PriceResult:
-        rng = self._make_rng()
 
-        # If model supports antithetic and user requested it, use it.
-        # antithetic的含义是在随机取样的过程中同时去随机数的本身和其相反数，当intrument函数是单调的时候会减小误差。
+    def price(self, *, model: PathModel, instrument: Instrument) -> PriceResult:
+        # sanity checks
+        if self.n_paths < 1:
+            raise ValueError("n_paths must be >= 1")
+        if self.n_steps < 1:
+            raise ValueError("n_steps must be >= 1")
+        if instrument.maturity < 0:
+            raise ValueError("maturity must be non-negative")
+
+        # Deterministic: T=0 => no simulation noise
+        if instrument.maturity == 0.0:
+            spot0 = float(getattr(model, "spot0", np.nan))
+            if not np.isfinite(spot0):
+                raise ValueError("model must expose spot0 for maturity=0 pricing.")
+            spot_T = np.array([spot0], dtype=float)
+            payoff0 = float(np.asarray(instrument.payoff(spot_T), dtype=float)[0])
+            return PriceResult(
+                price=payoff0,
+                stderr=0.0,
+                ci95=(payoff0, payoff0),
+                n_paths=1,
+                n_steps=1,
+                seed=self.seed,
+            )
+
+        rng = self._make_rng()
+        dt = float(instrument.maturity) / int(self.n_steps)
+
+        # Engine-controlled increments (model is independent of antithetic)
         if self.antithetic:
-            print("[MC] Using antithetic variates.")
-            paths = model.simulate_paths_antithetic(
+            print("[MC] using antithetic variates")
+            if self.n_paths % 2 != 0:
+                raise ValueError("n_paths must be even when antithetic=True.")
+            dW = brownian_increments_antithetic(
                 n_paths=self.n_paths,
                 n_steps=self.n_steps,
-                maturity=instrument.maturity,
+                dt=dt,
                 rng=rng,
             )
         else:
-            print("[MC] WARNING: Antithetic requested, but model does not support it. Falling back to minimal simulation.")
-            paths = model.simulate_paths(
+            dW = brownian_increments(
                 n_paths=self.n_paths,
                 n_steps=self.n_steps,
-                maturity=instrument.maturity,
+                dt=dt,
                 rng=rng,
             )
 
-        spot_T = paths[:, -1]
-        payoffs = instrument.payoff(spot_T)
+        # Model consumes dW; if your model signature does not accept dW yet, add it.
+        paths = model.simulate_paths(
+            n_paths=self.n_paths,
+            n_steps=self.n_steps,
+            maturity=instrument.maturity,
+            rng=rng,
+            dW=dW,
+        )
 
-        r = float(getattr(model, "rate", 0.0))
-        disc = float(np.exp(-r * instrument.maturity))
+        paths = np.asarray(paths, dtype=float)
+        spot_T = paths[:, -1]
+        payoffs = np.asarray(instrument.payoff(spot_T), dtype=float)
+
+        # Discounting: require model.rate (or switch to model.discount_factor)
+        if not hasattr(model, "rate"):
+            raise ValueError("model must expose a `rate` attribute for discounting.")
+        r = float(model.rate)
+        disc = float(np.exp(-r * float(instrument.maturity)))
         discounted = disc * payoffs
 
-        n = discounted.shape[0]
+        n = discounted.size
         price = float(discounted.mean())
-        stderr = float(discounted.std(ddof=1) / np.sqrt(n)) if n >= 2 else float("nan")
-        ci95 = (price - 1.96 * stderr, price + 1.96 * stderr) if n >= 2 else (float("nan"), float("nan"))
+
+        if n < 2:
+            stderr = 0.0
+            ci95 = (price, price)
+        else:
+            std = float(discounted.std(ddof=1))
+            stderr = std / np.sqrt(n)
+            ci95 = (price - 1.96 * stderr, price + 1.96 * stderr)
 
         return PriceResult(
             price=price,
-            stderr=stderr,
-            ci95=ci95,
-            n_paths=self.n_paths,
+            stderr=float(stderr),
+            ci95=(float(ci95[0]), float(ci95[1])),
+            n_paths=n,
             n_steps=self.n_steps,
             seed=self.seed,
         )

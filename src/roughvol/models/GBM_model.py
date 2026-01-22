@@ -49,7 +49,7 @@ class GBM_Model: # 由于包含simulate_paths这个函数，属于PathModel这�
 
         # If engine did not provide increments, generate plain ones (no antithetic here)
         if dW is None:
-            dW = brownian_increments(n_paths=n_paths, n_steps=n_steps, dt=dt, rng=rng)
+            dW = brownian_increments(n_paths=n_paths, n_steps=n_steps, dt=dt, rng=rng) 
         else:
             dW = np.asarray(dW, dtype=float)
             if dW.shape != (n_paths, n_steps):
