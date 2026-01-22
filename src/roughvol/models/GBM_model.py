@@ -27,6 +27,7 @@ class GBM_Model: # 由于包含simulate_paths这个函数，属于PathModel这�
         n_steps: int,
         maturity: float,
         rng: np.random.Generator,
+        dW: ArrayF | None = None,
     ) -> ArrayF:
         # Basic validation
         if self.spot0 <= 0:
@@ -46,8 +47,13 @@ class GBM_Model: # 由于包含simulate_paths这个函数，属于PathModel这�
 
         dt = maturity / n_steps
 
-        # Brownian increments: shape (n_paths, n_steps)
-        dW = brownian_increments(n_paths=n_paths, n_steps=n_steps, dt=dt, rng=rng) # fixed seed
+        # If engine did not provide increments, generate plain ones (no antithetic here)
+        if dW is None:
+            dW = brownian_increments(n_paths=n_paths, n_steps=n_steps, dt=dt, rng=rng)
+        else:
+            dW = np.asarray(dW, dtype=float)
+            if dW.shape != (n_paths, n_steps):
+                raise ValueError(f"dW must have shape {(n_paths, n_steps)}, got {dW.shape}")
 
         # Exact log-Euler (exact discretization for GBM)
         drift = (self.rate - self.div - 0.5 * self.vol**2) * dt
