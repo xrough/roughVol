@@ -1,7 +1,8 @@
-"""
+'''
 Type定义了class, PriceResult是定价输出, instrument是被定价的模型(定义为protocol保证灵活性), 
 PathModel定义各个过程. 
-"""
+'''
+
 
 from __future__ import annotations #避免循环reference
 
