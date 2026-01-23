@@ -25,6 +25,7 @@ python3 scripts/setup.py
 
 ## The current stage
 
+```text
 We have built so far a simple pricing project with the following structure tree:
 .
 ├── .gitignore
@@ -59,7 +60,7 @@ We have built so far a simple pricing project with the following structure tree:
     ├── test_MC.py
     ├── test_antithetic.py
     └── test_sanity.py
-
+```
 ## Next steps for this branch
 
 ### Types
