@@ -23,7 +23,7 @@ python3 scripts/setup.py
 ```
 ---
 
-## The current stage and the next-step design
+## The current stage
 
 We have built so far a simple pricing project with the following structure tree:
 .
@@ -60,3 +60,15 @@ We have built so far a simple pricing project with the following structure tree:
     ├── test_antithetic.py
     └── test_sanity.py
 
+## Next steps for this branch
+
+### Types
+Several new items should be added, we currently have 
+- PriceResult class
+- the PathModel class
+  - owns a simulate_paths function that generates path with time-grid, length and the randomness generator
+- Instrument class
+  - maturity time
+  - a function that calculates the payoff
+
+s
