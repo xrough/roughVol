@@ -4,7 +4,7 @@ Test examing that antithetic sampling reduces variation.
 '''
 import numpy as np
 
-from roughvol.engines.mc_v2 import MonteCarloEngineV2  # adjust path to your engine V2
+from roughvol.engines.mc import MonteCarloEngine  # adjust path to your engine V2
 from roughvol.models.GBM_model import GBM_Model              # adjust module name if different
 from roughvol.instruments.vanilla import VanillaOption # adjust module name if different
 
@@ -18,13 +18,13 @@ def test_antithetic_reduces_stderr():
     n_steps = 200
     seed = 123
 
-    eng_plain = MonteCarloEngineV2(
+    eng_plain = MonteCarloEngine(
         n_paths=n_paths,
         n_steps=n_steps,
         seed=seed,
         antithetic=False,
     )
-    eng_anti = MonteCarloEngineV2(
+    eng_anti = MonteCarloEngine(
         n_paths=n_paths,
         n_steps=n_steps,
         seed=seed,

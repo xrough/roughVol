@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from roughvol.sim.BM import brownian_increments # generate paths of BMs with given increment 
+from roughvol.sim.brownian import brownian_increments # generate paths of BMs with given increment 
 from roughvol.types import ArrayF
 
 '''
