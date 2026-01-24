@@ -70,6 +70,4 @@ Several new items should be added, we currently have
   - owns a simulate_paths function that generates path with time-grid, length and the randomness generator
 - Instrument class
   - maturity time
-  - a function that calculates the payoff
-
-s
+  - a function that calculates the payoff. 
