@@ -1,117 +1,116 @@
 '''
-蒙特卡洛引擎，加入antithetic取样的选择，以及SeedSequence。
+MC engine for possibly path-dependent instruments and various models.
+
+Key contracts (see roughvol.types):
+- model.simulate_paths(market=..., sim=..., rng=...) -> PathBundle
+- payoff resolved via compute_payoff(instrument, paths)
+- discounting via MarketData.rate and flat_discount_factor
 '''
 from __future__ import annotations
 
 from dataclasses import dataclass
 import numpy as np
 
-from roughvol.types import Instrument, PathModel, PriceResult
-from roughvol.sim.brownian import brownian_increments, brownian_increments_antithetic
+
+from roughvol.types import (
+    Instrument,
+    TerminalInstrument,
+    PathModel,
+    MarketData,
+    SimConfig,
+    PriceResult,
+    PathBundle,
+    ArrayF,
+    compute_payoff,
+    make_rng,
+    flat_discount_factor,
+)
+
 
 
 @dataclass(frozen=True)
 class MonteCarloEngine:
     '''
-    Drop-in Monte Carlo engine (terminal payoff), with:
-    - SeedSequence RNG discipline
-    - Optional antithetic variates (if model supports simulate_paths_antithetic)    
+    Monte Carlo engine (PathBundle-native).
+
+    Notes:
+    - n_paths/n_steps/seed/antithetic are engine defaults.
+      The engine packages them into SimConfig and passes to the model.
+    - Antithetic handling is a model responsibility via sim.antithetic. 
     '''
     
     n_paths: int = 200_000
     n_steps: int = 200
     seed: int | None = 0
-    antithetic: bool = True # 现在的引擎可选antithetic或者原始的mc。
-    
-    # 确认随机生成seed
-    def _make_rng(self) -> np.random.Generator:
-        if self.seed is None:
-            return np.random.default_rng()
-        return np.random.default_rng(np.random.SeedSequence(self.seed))
+    antithetic: bool = True
+    scheme: str = "euler"
+    store_paths: bool = True
 
-    def price(self, *, model: PathModel, instrument: Instrument) -> PriceResult:
-        # sanity checks
+    def price(
+        self,
+        *,
+        model: PathModel,
+        instrument: Instrument | TerminalInstrument,
+        market: MarketData,
+    ) -> PriceResult:
+        # --- sanity checks (engine-level) ---
         if self.n_paths < 1:
             raise ValueError("n_paths must be >= 1")
         if self.n_steps < 1:
             raise ValueError("n_steps must be >= 1")
         if instrument.maturity < 0:
-            raise ValueError("maturity must be non-negative")
+            raise ValueError("instrument.maturity must be non-negative")
+        if market.spot <= 0:
+            raise ValueError("market.spot must be positive")
 
-        # Deterministic: T=0 => no simulation noise
-        if instrument.maturity == 0.0:
-            spot0 = float(getattr(model, "spot0", np.nan))
-            if not np.isfinite(spot0):
-                raise ValueError("model must expose spot0 for maturity=0 pricing.")
-            spot_T = np.array([spot0], dtype=float)
-            payoff0 = float(np.asarray(instrument.payoff(spot_T), dtype=float)[0])
-            return PriceResult(
-                price=payoff0,
-                stderr=0.0,
-                ci95=(payoff0, payoff0),
-                n_paths=1,
-                n_steps=1,
-                seed=self.seed,
-            )
+        # --- Build simulation config (the model consumes this) ---
+        sim = SimConfig(
+            n_paths=int(self.n_paths),
+            maturity=float(instrument.maturity),
+            n_steps=int(self.n_steps),
+            seed=self.seed,
+            antithetic=bool(self.antithetic),
+            scheme=str(self.scheme),
+            store_paths=bool(self.store_paths),
+        )  # SimConfig.grid() defined in types.py 
 
-        rng = self._make_rng()
-        dt = float(instrument.maturity) / int(self.n_steps)
+        rng = make_rng(sim.seed)  # standardized RNG helper 
 
-        # Engine-controlled increments (model is independent of antithetic)
-        if self.antithetic:
-            print("[MC] using antithetic variates")
-            if self.n_paths % 2 != 0:
-                raise ValueError("n_paths must be even when antithetic=True.")
-            dW = brownian_increments_antithetic(
-                n_paths=self.n_paths,
-                n_steps=self.n_steps,
-                dt=dt,
-                rng=rng,
-            )
+        # --- Simulate paths ---
+        paths: PathBundle = model.simulate_paths(market=market, sim=sim, rng=rng)  
+
+        # --- Compute payoff (supports path-dependent + terminal-only legacy) ---
+        payoff: ArrayF = compute_payoff(instrument, paths)  
+        payoff = np.asarray(payoff, dtype=float).reshape(-1)
+
+        # --- Discount ---
+        df = flat_discount_factor(float(market.rate), float(instrument.maturity))  # 
+        pv = df * payoff
+
+        # --- MC stats ---
+        n = int(pv.size)
+        if n == 0:
+            raise ValueError("No payoffs produced (n_paths=0?)")
+
+        price = float(pv.mean())
+        if n > 1:
+            stderr = float(pv.std(ddof=1) / np.sqrt(n))
+            ci95 = (price - 1.96 * stderr, price + 1.96 * stderr)
         else:
-            dW = brownian_increments(
-                n_paths=self.n_paths,
-                n_steps=self.n_steps,
-                dt=dt,
-                rng=rng,
-            )
-
-        # Model consumes dW; if your model signature does not accept dW yet, add it.
-        paths = model.simulate_paths(
-            n_paths=self.n_paths,
-            n_steps=self.n_steps,
-            maturity=instrument.maturity,
-            rng=rng,
-            dW=dW,
-        )
-
-        paths = np.asarray(paths, dtype=float)
-        spot_T = paths[:, -1]
-        payoffs = np.asarray(instrument.payoff(spot_T), dtype=float)
-
-        # Discounting: require model.rate (or switch to model.discount_factor)
-        if not hasattr(model, "rate"):
-            raise ValueError("model must expose a `rate` attribute for discounting.")
-        r = float(model.rate)
-        disc = float(np.exp(-r * float(instrument.maturity)))
-        discounted = disc * payoffs
-
-        n = discounted.size
-        price = float(discounted.mean())
-
-        if n < 2:
             stderr = 0.0
             ci95 = (price, price)
-        else:
-            std = float(discounted.std(ddof=1))
-            stderr = std / np.sqrt(n)
-            ci95 = (price - 1.96 * stderr, price + 1.96 * stderr)
 
         return PriceResult(
             price=price,
-            stderr=float(stderr),
+            stderr=stderr,
             ci95=(float(ci95[0]), float(ci95[1])),
             n_paths=n,
-            n_steps=self.n_steps,
+            n_steps=int(paths.n_times - 1),  # realized from PathBundle grid 
             seed=self.seed,
+            metadata={
+                "df": df,
+                "antithetic": bool(sim.antithetic),
+                "scheme": sim.scheme,
+                "store_paths": bool(sim.store_paths),
+            },
         )

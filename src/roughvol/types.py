@@ -292,7 +292,10 @@ def compute_payoff(
 
 
 def make_rng(seed: int | None) -> np.random.Generator:
-    return np.random.default_rng(seed)
+    if seed is None:
+        return np.random.default_rng()
+    # Use SeedSequence for robust, reproducible streams
+    return np.random.default_rng(np.random.SeedSequence(seed))
 
 
 def flat_discount_factor(rate: float, t: float) -> float:
