@@ -117,6 +117,8 @@ class SimConfig:
 
         if self.n_steps is None:
             raise ValueError("Provide either time_grid or n_steps")
+        if self.maturity == 0.0:
+            return np.array([0.0], dtype=float)
 
         return np.linspace(0.0, self.maturity, self.n_steps + 1)
 
