@@ -27,7 +27,10 @@ class GBM_Model:
     SimConfig provides:
         n_paths, grid(), (optionally) antithetic
     '''
-    sigma: float # Prescribed constant multiplicative constant of the diffusion.
+    
+    # Prescribed constant multiplicative constant of the diffusion.
+    sigma: float 
+    
     def simulate_paths( # Method prescribed by PathModel Protocol.
         self,
         *,

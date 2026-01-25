@@ -45,7 +45,7 @@ class MonteCarloEngine:
     antithetic: bool = True
     scheme: str = "euler"
     store_paths: bool = True
-
+    # price method: given model, instrument, market, return PriceResult
     def price(
         self,
         *,
@@ -65,13 +65,13 @@ class MonteCarloEngine:
 
         # --- Build simulation config (the model consumes this) ---
         sim = SimConfig(
-            n_paths=int(self.n_paths),
-            maturity=float(instrument.maturity),
-            n_steps=int(self.n_steps),
+            n_paths=self.n_paths,
+            maturity=instrument.maturity,
+            n_steps=self.n_steps,
             seed=self.seed,
-            antithetic=bool(self.antithetic),
-            scheme=str(self.scheme),
-            store_paths=bool(self.store_paths),
+            antithetic=self.antithetic,
+            scheme=self.scheme,
+            store_paths=self.store_paths,
         )  # SimConfig.grid() defined in types.py 
 
         rng = make_rng(sim.seed)  # standardized RNG helper 

@@ -29,9 +29,9 @@ class VanillaOption:
         return self.payoff_terminal(spot_T)
 
     def payoff_terminal(self, spot_T: ArrayF) -> ArrayF:
-        """
+        '''
         Terminal-only payoff (legacy-compatible).
-        """
+        '''
         spot_T = np.asarray(spot_T, dtype=float)
 
         # Allow either shape (n_paths,) or (n_paths, 1) and normalize
