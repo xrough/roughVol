@@ -8,59 +8,143 @@ from dataclasses import dataclass
 import numpy as np
 
 from roughvol.sim.brownian import brownian_increments # generate paths of BMs with given increment 
-from roughvol.types import ArrayF
+from roughvol.types import ArrayF, PathBundle, MarketData, SimConfig
 
-'''
-参数self有些神奇，此处指代包含simulate_paths的class。
-'''
+# 由于包含simulate_paths这个函数，GBM_Model属于PathModel这个Class。
 
 @dataclass(frozen=True)
-class GBM_Model: # 由于包含simulate_paths这个函数，属于PathModel这个Class。
-    spot0: float # S_0
-    rate: float # risk free rate
-    div: float # dividend
-    vol: float # constant vol
-    def simulate_paths( #this is a method, which is just a function within a class.
+class GBM_Model: 
+    '''
+    Geometric Brownian Motion (risk-neutral):
+        dS_t = (r - q) S_t dt + sigma S_t dW_t
+
+    Model parameter:
+        sigma: constant volatility coefficient.
+
+    MarketData provides:
+        spot, rate, div_yield
+    
+    SimConfig provides:
+        n_paths, grid(), (optionally) antithetic
+    '''
+    sigma: float # Prescribed constant multiplicative constant of the diffusion.
+    def simulate_paths( # Method prescribed by PathModel Protocol.
         self,
         *,
-        n_paths: int,
-        n_steps: int,
-        maturity: float,
+        market: MarketData,
+        sim: SimConfig,
         rng: np.random.Generator,
-        dW: ArrayF | None = None,
-    ) -> ArrayF:
-        # Basic validation
-        if self.spot0 <= 0:
-            raise ValueError("spot0 must be positive.")
-        if self.vol < 0:
+    ) -> PathBundle:
+        # ---- Validate model parameter ----
+        vol = float(self.vol) # read sigma from the model.
+        if vol < 0.0:
             raise ValueError("vol must be non-negative.")
-        if maturity < 0:
-            raise ValueError("maturity must be nonnegative.")
-        if n_steps <= 0:
-            raise ValueError("n_steps must be positive.")
-        if n_paths <= 0:
-            raise ValueError("n_paths must be positive.")
+
+        # ---- Read market inputs ----
+        spot0 = float(market.spot)
+        r = float(market.rate)
+        q = float(market.div_yield)
+
+        if spot0 <= 0.0:
+            raise ValueError("market.spot must be positive.")
         
-        # --- NEW: zero maturity short-circuit ---
-        if maturity == 0:
-            return np.full((n_paths, 1), self.spot0, dtype=float)
+        # ---- Build time grid from the configuration: SimConfig ----
+        t = np.asarray(sim.grid(), dtype=float)  # shape (n_times,)
+        n_times = int(t.size)
+        if n_times < 1:
+            raise ValueError("sim.grid() must return a non-empty time grid.")
+        
+        # ---- Read simulation controls (number of paths) ----
+        n_paths = int(sim.n_paths)
+        if n_paths <= 0:
+            raise ValueError("sim.n_paths must be positive.")
 
-        dt = maturity / n_steps
+        # If grid has only time 0 (maturity=0 case)
+        if n_times == 1:
+            spot = np.full((n_paths, 1), spot0, dtype=float)
+            return PathBundle(
+                t=t,
+                state={"spot": spot},
+                metadata={"model": "GBM", "scheme": "exact"},
+            )
 
-        # If engine did not provide increments, generate plain ones (no antithetic here)
-        if dW is None:
-            dW = brownian_increments(n_paths=n_paths, n_steps=n_steps, dt=dt, rng=rng) 
+        dt = np.diff(t)  # shape (n_times-1,)
+        if np.any(dt <= 0.0):
+            raise ValueError("Time grid must be strictly increasing (dt > 0).")
+
+        n_steps = n_times - 1
+        
+        # ---- Generate Brownian increments dW ----
+        # Convention: brownian_increments returns sqrt(dt) * Z, so diffusion is vol * dW.
+        # Handle (optional) antithetic variates if sim.antithetic exists.
+        use_antithetic = bool(getattr(sim, "antithetic", False))
+
+        dW = np.empty((n_paths, n_steps), dtype=float)
+
+        if not use_antithetic:
+            # If dt is constant, one call is enough; otherwise generate stepwise.
+            if np.allclose(dt, dt[0]):
+                dW[:, :] = brownian_increments(
+                    n_paths=n_paths, n_steps=n_steps, dt=float(dt[0]), rng=rng
+                )
+            else:
+                for j in range(n_steps):
+                    dW[:, j:j+1] = brownian_increments(
+                        n_paths=n_paths, n_steps=1, dt=float(dt[j]), rng=rng
+                    )
         else:
-            dW = np.asarray(dW, dtype=float)
-            if dW.shape != (n_paths, n_steps):
-                raise ValueError(f"dW must have shape {(n_paths, n_steps)}, got {dW.shape}")
+            # Antithetic: generate half and mirror. If odd n_paths, add one extra path.
+            half = n_paths // 2
+            remainder = n_paths - 2 * half
 
-        # Exact log-Euler (exact discretization for GBM)
-        drift = (self.rate - self.div - 0.5 * self.vol**2) * dt
-        diffusion = self.vol * dW
+            if np.allclose(dt, dt[0]):
+                dW_half = brownian_increments(
+                    n_paths=half, n_steps=n_steps, dt=float(dt[0]), rng=rng
+                )
+            else:
+                dW_half = np.empty((half, n_steps), dtype=float)
+                for j in range(n_steps):
+                    dW_half[:, j:j+1] = brownian_increments(
+                        n_paths=half, n_steps=1, dt=float(dt[j]), rng=rng
+                    )
 
-        logS = np.empty((n_paths, n_steps + 1), dtype=float) # shape of log price
-        logS[:, 0] = np.log(self.spot0) #初值
-        logS[:, 1:] = logS[:, [0]] + np.cumsum(drift + diffusion, axis=1) # cumsum: cummulation sum
+            dW[:half, :] = dW_half
+            dW[half:2 * half, :] = -dW_half
 
-        return np.exp(logS)
+            if remainder:
+                # One additional independent path (or more, but remainder can only be 1 here)
+                if np.allclose(dt, dt[0]):
+                    dW_extra = brownian_increments(
+                        n_paths=remainder, n_steps=n_steps, dt=float(dt[0]), rng=rng
+                    )
+                else:
+                    dW_extra = np.empty((remainder, n_steps), dtype=float)
+                    for j in range(n_steps):
+                        dW_extra[:, j:j+1] = brownian_increments(
+                            n_paths=remainder, n_steps=1, dt=float(dt[j]), rng=rng
+                        )
+                dW[2 * half:, :] = dW_extra
+
+        # ---- Simulate GBM paths (exact log scheme) ----
+        spot = np.empty((n_paths, n_times), dtype=float)
+        spot[:, 0] = spot0
+
+        for j in range(n_steps):
+            dt_j = float(dt[j])
+            drift = (r - q - 0.5 * vol * vol) * dt_j
+            diffusion = vol * dW[:, j]  # dW already includes sqrt(dt_j)
+            spot[:, j + 1] = spot[:, j] * np.exp(drift + diffusion)
+
+        # ---- Package into PathBundle ----
+        return PathBundle(
+            t=t,
+            state={"spot": spot},
+            extras={"dW": dW},  # optional; remove if you don't want to store increments
+            metadata={
+                "model": "GBM",
+                "scheme": "exact",
+                "vol": vol,
+                "antithetic": use_antithetic,
+            },
+        )
+
