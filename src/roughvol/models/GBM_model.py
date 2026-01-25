@@ -36,9 +36,9 @@ class GBM_Model:
         rng: np.random.Generator,
     ) -> PathBundle:
         # ---- Validate model parameter ----
-        vol = float(self.vol) # read sigma from the model.
-        if vol < 0.0:
-            raise ValueError("vol must be non-negative.")
+        sigma = float(self.sigma) # read sigma from the model.
+        if sigma < 0.0:
+            raise ValueError("sigma must be non-negative.")
 
         # ---- Read market inputs ----
         spot0 = float(market.spot)
@@ -72,10 +72,10 @@ class GBM_Model:
         if np.any(dt <= 0.0):
             raise ValueError("Time grid must be strictly increasing (dt > 0).")
 
-        n_steps = n_times - 1
+        n_steps = n_times - 1 # increment number = grid points - 1.
         
         # ---- Generate Brownian increments dW ----
-        # Convention: brownian_increments returns sqrt(dt) * Z, so diffusion is vol * dW.
+        # Convention: brownian_increments returns sqrt(dt) * Z, so diffusion is sigma * dW.
         # Handle (optional) antithetic variates if sim.antithetic exists.
         use_antithetic = bool(getattr(sim, "antithetic", False))
 
@@ -110,7 +110,8 @@ class GBM_Model:
 
             dW[:half, :] = dW_half
             dW[half:2 * half, :] = -dW_half
-
+            
+            # Statistically redundant but easier to match the size if n_paths is odd.
             if remainder:
                 # One additional independent path (or more, but remainder can only be 1 here)
                 if np.allclose(dt, dt[0]):
@@ -131,19 +132,19 @@ class GBM_Model:
 
         for j in range(n_steps):
             dt_j = float(dt[j])
-            drift = (r - q - 0.5 * vol * vol) * dt_j
-            diffusion = vol * dW[:, j]  # dW already includes sqrt(dt_j)
+            drift = (r - q - 0.5 * sigma * sigma) * dt_j
+            diffusion = sigma * dW[:, j]  # dW already includes sqrt(dt_j)
             spot[:, j + 1] = spot[:, j] * np.exp(drift + diffusion)
 
         # ---- Package into PathBundle ----
         return PathBundle(
             t=t,
             state={"spot": spot},
-            extras={"dW": dW},  # optional; remove if you don't want to store increments
+            extras={"dW": dW}, # include the Brownian increments for calibrations. 
             metadata={
                 "model": "GBM",
                 "scheme": "exact",
-                "vol": vol,
+                "sigma": sigma,
                 "antithetic": use_antithetic,
             },
         )
