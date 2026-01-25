@@ -72,8 +72,8 @@ class GBM_Model:
             )
 
         dt = np.diff(t)  # shape (n_times-1,)
-        if np.any(dt <= 0.0):
-            raise ValueError("Time grid must be strictly increasing (dt > 0).")
+        if np.any(dt < 0.0):
+            raise ValueError("Time grid must be increasing (dt >= 0).")
 
         n_steps = n_times - 1 # increment number = grid points - 1.
         

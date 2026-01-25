@@ -37,8 +37,8 @@ def brownian_increments(
         raise ValueError("n_paths must be positive.")
     if n_steps <= 0: #每次模拟的grid
         raise ValueError("n_steps must be positive.")
-    if dt <= 0:
-        raise ValueError("dt must be positive.")
+    if dt < 0:
+        raise ValueError("dt must be non-negative.")
 
     z = rng.standard_normal(size=(int(n_paths), int(n_steps))) #随机的矩阵，每个坐标都normal取样.
     return np.sqrt(float(dt)) * z
@@ -65,8 +65,8 @@ def brownian_increments_antithetic(
         raise ValueError("n_paths must be positive.")
     if n_steps <= 0:
         raise ValueError("n_steps must be positive.")
-    if dt <= 0:
-        raise ValueError("dt must be positive.")
+    if dt < 0:
+        raise ValueError("dt must be non-negative.")
     if n_paths % 2 != 0:
         raise ValueError("n_paths must be even for antithetic increments.")
 
