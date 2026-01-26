@@ -31,12 +31,10 @@ from roughvol.types import (
 @dataclass(frozen=True)
 class MonteCarloEngine:
     '''
-    Monte Carlo engine (PathBundle-native).
-
-    Notes:
-    - n_paths/n_steps/seed/antithetic are engine defaults.
+    Monte Carlo engine:
+    - n_paths/n_steps/seed/antithetic/scheme/store_paths are engine defaults.
       The engine packages them into SimConfig and passes to the model.
-    - Antithetic handling is a model responsibility via sim.antithetic. 
+    - price function: given model, instrument/terminal instrument, market, return PriceResult.
     '''
     
     n_paths: int = 200_000

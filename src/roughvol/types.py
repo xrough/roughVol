@@ -69,7 +69,7 @@ class PathBundle:
     '''
     Standardized model output container.
     - spot shape: (n_paths, n_times), economic state variable along paths (spot S_t, volatility v_t etc.).
-      - should align with time grid t.
+      - therefore should align with time grid t.
     - t: time shape: (n_times,)
     - variance shape (if present): (n_paths, n_times)
     '''
@@ -96,7 +96,7 @@ class PathBundle:
         if spot.shape[1] != t.shape[0]:
             raise ValueError("spot arrays must align with time grid")
 
-        for k, v in self.state.items():
+        for k, v in self.state.items(): # items() returns key-value pairs.
             arr = np.asarray(v)
             if arr.shape != spot.shape:
                 raise ValueError(f"state['{k}'] shape mismatch")
@@ -117,7 +117,8 @@ class PathBundle:
     @property
     def n_times(self) -> int:
         return int(self.spot.shape[1])
-
+    
+    # for extension: get state by name. 
     def get(self, name: str) -> ArrayF:
         return self.state[name]
 
@@ -139,7 +140,6 @@ class PriceResult:
 
 # ============================================================================
 # Protocols (capability boundaries)
-# 即规定了几个Components最少需要满足哪些条件。
 # ============================================================================
 
 @runtime_checkable

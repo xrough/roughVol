@@ -93,9 +93,10 @@ def main() -> None:
     for k in strikes:
         opt = VanillaOption(strike=k, maturity=args.maturity, is_call=args.is_call)
 
-        # pass market into engine now -> result.
+        # pass model, instrument and market into engine now -> result.
         res = engine.price(model=model, instrument=opt, market=market)
-
+        
+        # calulate implied vol from price.
         iv = implied_vol(
             price=res.price,
             spot=args.spot,
