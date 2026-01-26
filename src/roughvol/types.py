@@ -130,7 +130,7 @@ class PathBundle:
         method: Literal["previous", "linear"] = "linear",
         tol: float = 1e-12,
     ) -> ArrayF:
-        """
+        '''
         Evaluate spot S(t) at arbitrary times by interpreting the discrete path
         as a continuous-time function via interpolation.
 
@@ -147,7 +147,7 @@ class PathBundle:
         Returns
         -------
         ArrayF with shape (n_paths, n_times_query)
-        """
+        '''
         t_grid = np.asarray(self.t, dtype=float)
         S = np.asarray(self.spot, dtype=float)  # (n_paths, n_times_grid)
         q = np.asarray(times, dtype=float)
@@ -162,7 +162,7 @@ class PathBundle:
         t0 = float(t_grid[0])
         t1 = float(t_grid[-1])
 
-        # Allow tiny tolerance at boundaries (common numerical issue)
+        # Allow tiny tolerance at boundaries
         if np.any(q < t0 - tol) or np.any(q > t1 + tol):
             raise ValueError(f"Query times must lie within [{t0}, {t1}] (tol={tol}).")
 
