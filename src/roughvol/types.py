@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field 
 
-from typing import Protocol, runtime_checkable, Mapping, Any, Callable
+from typing import Protocol, runtime_checkable, Mapping, Any, Callable, Literal
 import numpy as np
 
 ArrayF = np.ndarray # 简写ndarray
@@ -121,6 +121,78 @@ class PathBundle:
     # for extension: get state by name. 
     def get(self, name: str) -> ArrayF:
         return self.state[name]
+    
+    # interpolate spot at arbitrary times in case continuum evaluation is needed.
+    def spot_at(
+        self,
+        times: ArrayF,
+        *,
+        method: Literal["previous", "linear"] = "linear",
+        tol: float = 1e-12,
+    ) -> ArrayF:
+        """
+        Evaluate spot S(t) at arbitrary times by interpreting the discrete path
+        as a continuous-time function via interpolation.
+
+        Parameters
+        ----------
+        times:
+            1D array of query times in [t[0], t[-1]].
+        method:
+            "previous": left-continuous piecewise-constant (ladder) interpolation
+            "linear": piecewise-linear interpolation
+        tol:
+            tolerance for boundary handling (e.g., t[-1]).
+
+        Returns
+        -------
+        ArrayF with shape (n_paths, n_times_query)
+        """
+        t_grid = np.asarray(self.t, dtype=float)
+        S = np.asarray(self.spot, dtype=float)  # (n_paths, n_times_grid)
+        q = np.asarray(times, dtype=float)
+
+        if q.ndim != 1:
+            raise ValueError("times must be a 1D array")
+        if t_grid.ndim != 1:
+            raise ValueError("PathBundle.t must be a 1D array")
+        if S.ndim != 2 or S.shape[1] != t_grid.shape[0]:
+            raise ValueError("PathBundle.spot must be (n_paths, n_times) aligned with t")
+
+        t0 = float(t_grid[0])
+        t1 = float(t_grid[-1])
+
+        # Allow tiny tolerance at boundaries (common numerical issue)
+        if np.any(q < t0 - tol) or np.any(q > t1 + tol):
+            raise ValueError(f"Query times must lie within [{t0}, {t1}] (tol={tol}).")
+
+        # Clip within bounds for stable indexing (esp. q == t1)
+        q = np.clip(q, t0, t1)
+
+        # For each q, find right interval index i such that t[i] <= q <= t[i+1]
+        # searchsorted returns insertion point; subtract 1 gives left index.
+        idx = np.searchsorted(t_grid, q, side="right") - 1
+        idx = np.clip(idx, 0, len(t_grid) - 2)  # last interval is [n-2, n-1]
+
+        if method == "previous":
+            # left-continuous: S(q) = S(t[idx])
+            return S[:, idx]
+
+        if method == "linear":
+            tL = t_grid[idx]          # (m,)
+            tR = t_grid[idx + 1]      # (m,)
+            SL = S[:, idx]            # (n_paths, m)
+            SR = S[:, idx + 1]        # (n_paths, m)
+
+            denom = (tR - tL)
+            # denom should be > 0 if grid is strictly increasing, but guard anyway
+            if np.any(denom <= 0):
+                raise ValueError("Time grid must be strictly increasing for linear interpolation.")
+
+            w = (q - tL) / denom       # (m,)
+            return SL + (SR - SL) * w  # broadcasts w across paths
+
+        raise ValueError(f"Unknown method: {method!r}. Use 'previous' or 'linear'.")
 
 # ============================================================================
 # Pricing output

@@ -132,3 +132,15 @@ types.py
         ├── make_rng(seed) -> Generator
         └── flat_discount_factor(rate, t) -> float
 ```
+
+### Instrument
+
+We include now path-dependent instrument like asian options as we have now a flexible structure with PathBundle and SimConfig. We remark some major technical point of the extensions: 
+
+- Due to time discretization, it must be ensured that the observation times may not align with the  simulation grid. We could either of the following: 
+    - interpolate the simulation grid,
+    - require the observation times to lie on the grid.
+
+To be able to include them, we
+- create a method named spot_at in PathBundle to interpolate the spot price,
+- 
