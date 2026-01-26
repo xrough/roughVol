@@ -98,7 +98,6 @@ def test_bs_price_inside_mc_ci_optional():
 
 
 def test_antithetic_reduces_stderr_odd_paths():
-    
     '''
     Antithetic test robust to odd n_paths when the model uses a remainder path.
 
@@ -112,7 +111,7 @@ def test_antithetic_reduces_stderr_odd_paths():
     n_paths = 200_001  # odd => remainder logic exercised
     n_steps = 200
 
-    seeds = [11, 22, 33, 44, 55, 66, 77]
+    seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 110]
 
     widths_plain = []
     widths_anti = []
