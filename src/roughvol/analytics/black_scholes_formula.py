@@ -1,13 +1,14 @@
 '''
-Black-Scholes的分析模型，deterministic，包含一个bs公式函数和一个vol的计算函数，由单调性寻找vol的预估值。作为MC的benchmark。
 The Black–Scholes formula prices a European option as the discounted expected payoff at maturity, 
 assuming lognormal asset prices with constant volatility.
+
+Benchmark implementation for European option pricing and implied volatility calculation.
 '''
 
 from __future__ import annotations
 
 import math
-from scipy.stats import norm # 正太
+from scipy.stats import norm # normal distribution.
 
 def bs_price(*, spot: float, strike: float, maturity: float, rate: float, div: float, vol: float, is_call: bool) -> float:
     '''
@@ -37,7 +38,7 @@ def bs_price(*, spot: float, strike: float, maturity: float, rate: float, div: f
 
 
 '''
-implied vol在BS中可以直接求解，但是一般模型中找它是ill-posedness，需要restriction。
+Implied volatility calculation via bisection method, solvable since BS price is monotonic in vol.
 '''
 
 def implied_vol(*, price: float, spot: float, strike: float, maturity: float, rate: float, div: float, is_call: bool) -> float:

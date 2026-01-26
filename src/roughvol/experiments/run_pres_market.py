@@ -11,7 +11,7 @@ from roughvol.models.GBM_model import GBM_Model
 from roughvol.instruments.vanilla import VanillaOption
 from roughvol.engines.mc import MonteCarloEngine
 
-from roughvol.types import MarketData  # NEW
+from roughvol.types import MarketData  
 from roughvol.analytics.black_scholes_formula import implied_vol
 
 

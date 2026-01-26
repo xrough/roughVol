@@ -15,17 +15,9 @@ from roughvol.types import ArrayF, PathBundle, MarketData, SimConfig
 @dataclass(frozen=True)
 class GBM_Model: 
     '''
-    Geometric Brownian Motion (risk-neutral):
-        dS_t = (r - q) S_t dt + sigma S_t dW_t
-
-    Model parameter:
-        sigma: constant volatility coefficient.
-
-    MarketData provides:
-        spot, rate, div_yield
-    
-    SimConfig provides:
-        n_paths, grid(), (optionally) antithetic
+    Geometric Brownian Motion (risk-neutral), contract: PathModel.
+    - sigma: constant volatility coefficient.
+    - simulate_paths: simulate paths with input from market and sim config and output PathBundle.
     '''
     
     # Prescribed constant multiplicative constant of the diffusion.
