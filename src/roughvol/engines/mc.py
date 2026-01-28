@@ -6,6 +6,7 @@ Key contracts (see roughvol.types):
 - payoff resolved via compute_payoff(instrument, paths)
 - discounting via MarketData.rate and flat_discount_factor
 '''
+
 from __future__ import annotations
 
 from dataclasses import dataclass

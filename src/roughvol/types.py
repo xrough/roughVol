@@ -238,9 +238,8 @@ class PathModel(Protocol):
         ...
 
 # ============================================================================
-# Adapter helpers
-# ============================================================================
-# In this version, we have different interfaces, and adpater serves as temporary glue. 
+# Aux functions
+# ============================================================================ 
 
 def compute_payoff(instrument: Instrument, paths: PathBundle) -> ArrayF:
     payoff_paths = getattr(instrument, "payoff", None)

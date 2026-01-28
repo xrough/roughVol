@@ -97,7 +97,7 @@ def test_bs_price_inside_mc_ci_optional():
     assert mc.ci95[0] <= bs <= mc.ci95[1]
 
 
-def test_antithetic_reduces_stderr_odd_paths():
+def test_antithetic_reduces_stderr():
     '''
     Antithetic test robust to odd n_paths when the model uses a remainder path.
 
@@ -108,7 +108,7 @@ def test_antithetic_reduces_stderr_odd_paths():
     model = GBM_Model(sigma=0.2)
     inst = VanillaOption(strike=100.0, maturity=1.0, is_call=True)
 
-    n_paths = 200_001  # odd => remainder logic exercised
+    n_paths = 200_000
     n_steps = 200
 
     seeds = [11, 22, 33, 44, 55, 66, 77, 88, 99, 110]

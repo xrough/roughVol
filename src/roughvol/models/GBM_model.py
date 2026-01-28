@@ -71,55 +71,30 @@ class GBM_Model:
         
         # ---- Generate Brownian increments dW ----
         # Convention: brownian_increments returns sqrt(dt) * Z, so diffusion is sigma * dW.
-        # Handle (optional) antithetic variates if sim.antithetic exists.
         use_antithetic = bool(getattr(sim, "antithetic", False))
 
         dW = np.empty((n_paths, n_steps), dtype=float)
+        
+        if use_antithetic and (n_paths % 2 != 0):
+            raise ValueError("n_paths must be even when antithetic=True.")
 
-        if not use_antithetic:
-            # If dt is constant, one call is enough; otherwise generate stepwise.
-            if np.allclose(dt, dt[0]):
-                dW[:, :] = brownian_increments(
-                    n_paths=n_paths, n_steps=n_steps, dt=float(dt[0]), rng=rng
-                )
-            else:
-                for j in range(n_steps):
-                    dW[:, j:j+1] = brownian_increments(
-                        n_paths=n_paths, n_steps=1, dt=float(dt[j]), rng=rng
-                    )
+        if np.allclose(dt, dt[0]):
+            dW[:, :] = brownian_increments(
+                n_paths=n_paths,
+                n_steps=n_steps,
+                dt=float(dt[0]),
+                rng=rng,
+                antithetic=use_antithetic,
+            )
         else:
-            # Antithetic: generate half and mirror. If odd n_paths, add one extra path.
-            half = n_paths // 2
-            remainder = n_paths - 2 * half
-
-            if np.allclose(dt, dt[0]):
-                dW_half = brownian_increments(
-                    n_paths=half, n_steps=n_steps, dt=float(dt[0]), rng=rng
+            for j in range(n_steps):
+                dW[:, j:j+1] = brownian_increments(
+                    n_paths=n_paths,
+                    n_steps=1,
+                    dt=float(dt[j]),
+                    rng=rng,
+                    antithetic=use_antithetic,
                 )
-            else:
-                dW_half = np.empty((half, n_steps), dtype=float)
-                for j in range(n_steps):
-                    dW_half[:, j:j+1] = brownian_increments(
-                        n_paths=half, n_steps=1, dt=float(dt[j]), rng=rng
-                    )
-
-            dW[:half, :] = dW_half
-            dW[half:2 * half, :] = -dW_half
-            
-            # Statistically redundant but easier to match the size if n_paths is odd.
-            if remainder:
-                # One additional independent path (or more, but remainder can only be 1 here)
-                if np.allclose(dt, dt[0]):
-                    dW_extra = brownian_increments(
-                        n_paths=remainder, n_steps=n_steps, dt=float(dt[0]), rng=rng
-                    )
-                else:
-                    dW_extra = np.empty((remainder, n_steps), dtype=float)
-                    for j in range(n_steps):
-                        dW_extra[:, j:j+1] = brownian_increments(
-                            n_paths=remainder, n_steps=1, dt=float(dt[j]), rng=rng
-                        )
-                dW[2 * half:, :] = dW_extra
 
         # ---- Simulate GBM paths (exact log scheme) ----
         spot = np.empty((n_paths, n_times), dtype=float)
