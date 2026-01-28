@@ -220,17 +220,7 @@ class Instrument(Protocol): # Protocol规定class至少要满足的条件。
 
     maturity: float  #结算时间
 
-    def payoff(self, path: PathBundle) -> ArrayF:
-        ...
-
-@runtime_checkable
-class TerminalInstrument(Protocol):
-    '''
-    Legacy / terminal-only payoff.
-    '''
-    maturity: float
-
-    def payoff_terminal(self, spot_T: ArrayF) -> ArrayF:
+    def payoff(self, paths: PathBundle) -> ArrayF:
         ...
 
 @runtime_checkable
@@ -252,32 +242,18 @@ class PathModel(Protocol):
 # ============================================================================
 # In this version, we have different interfaces, and adpater serves as temporary glue. 
 
-def compute_payoff(
-    instrument: Instrument | TerminalInstrument,
-    paths: PathBundle,
-) -> ArrayF:
-    '''
-    Backward-compatible payoff resolution.
-    '''
-    
-    ''' payoff_paths means:
-        Does instrument have (path) payoff?
-        ├─ Yes → try path payoff
-        │   ├─ Works → return result
-        │   └─ TypeError → ignore, continue
-        └─ No → try terminal payoff...
-    '''
+def compute_payoff(instrument: Instrument, paths: PathBundle) -> ArrayF:
     payoff_paths = getattr(instrument, "payoff", None)
-    if callable(payoff_paths):
-        return np.asarray(payoff_paths(paths))
+    if not callable(payoff_paths):
+        raise TypeError("Instrument must implement payoff(paths: PathBundle).")
 
-    payoff_terminal = getattr(instrument, "payoff_terminal", None)
-    if callable(payoff_terminal):
-        return np.asarray(payoff_terminal(paths.spot_T))
-
-    raise TypeError(
-        "Instrument must implement payoff(paths) or payoff_terminal(spot_T)"
-    )
+    out = np.asarray(payoff_paths(paths))
+    if out.ndim != 1 or out.shape[0] != paths.n_paths:
+        raise ValueError(
+            f"Instrument.payoff must return shape (n_paths,), got {out.shape} "
+            f"for n_paths={paths.n_paths}."
+        )
+    return out
 
 
 def make_rng(seed: int | None) -> np.random.Generator:

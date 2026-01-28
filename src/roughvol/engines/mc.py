@@ -14,7 +14,6 @@ import numpy as np
 
 from roughvol.types import (
     Instrument,
-    TerminalInstrument,
     PathModel,
     MarketData,
     SimConfig,
@@ -34,7 +33,7 @@ class MonteCarloEngine:
     Monte Carlo engine:
     - n_paths/n_steps/seed/antithetic/scheme/store_paths are engine defaults.
       The engine packages them into SimConfig and passes to the model.
-    - price function: given model, instrument/terminal instrument, market, return PriceResult.
+    - price function: given model, instrument, market, return PriceResult.
     '''
     
     n_paths: int = 200_000
@@ -48,7 +47,7 @@ class MonteCarloEngine:
         self,
         *,
         model: PathModel,
-        instrument: Instrument | TerminalInstrument,
+        instrument: Instrument,
         market: MarketData,
     ) -> PriceResult:
         # --- sanity checks (engine-level) ---
@@ -77,7 +76,7 @@ class MonteCarloEngine:
         # --- Simulate paths ---
         paths: PathBundle = model.simulate_paths(market=market, sim=sim, rng=rng)  
 
-        # --- Compute payoff (supports path-dependent + terminal-only legacy) ---
+        # --- Compute payoff ---
         payoff: ArrayF = compute_payoff(instrument, paths)  
         payoff = np.asarray(payoff, dtype=float).reshape(-1)
 

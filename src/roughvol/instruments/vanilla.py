@@ -25,7 +25,8 @@ class VanillaOption:
         Uses terminal spot extracted from paths.spot_T.
         '''
         
-        spot_T = np.asarray(paths.spot_T, dtype=float)  # PathBundle provides spot_T :contentReference[oaicite:3]{index=3}
+        spot_T = np.asarray(paths.spot_T, dtype=float)  
+        # PathBundle provides spot_T :contentReference[oaicite:3]{index=3}
         # Allow either shape (n_paths,) or (n_paths, 1) and normalize
         if spot_T.ndim == 2 and spot_T.shape[1] == 1:
             spot_T = spot_T[:, 0]
