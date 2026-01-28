@@ -70,13 +70,12 @@ def correlated_brownian_increments(
     rng: np.random.Generator,
     antithetic: bool = False,
 ) -> tuple[ArrayF, ArrayF]:
-    """
-    Generate correlated Brownian increments (dW1, dW2) with corr = rho.
+    '''Generate correlated Brownian increments (dW1, dW2) with corr = rho.
 
     Returns
     -------
     (dW1, dW2): each shape (n_paths, n_steps), each ~ N(0, dt)
-    """
+    '''
     if dt < 0:
         raise ValueError("dt must be non-negative.")
     z1, z2 = correlated_standard_normals(
@@ -98,13 +97,13 @@ def correlated_standard_normals(
     rng: np.random.Generator,
     antithetic: bool = False,
 ) -> tuple[ArrayF, ArrayF]:
-    """
+    '''
     Generate (Z1, Z2) with corr(Z1, Z2)=rho, each ~ N(0,1).
 
     Returns
     -------
     (Z1, Z2): each shape (n_paths, n_steps)
-    """
+    '''
     if not (-1.0 <= rho <= 1.0):
         raise ValueError("rho must be in [-1, 1].")
     if antithetic and (n_paths % 2 != 0):
