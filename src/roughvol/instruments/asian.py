@@ -28,16 +28,18 @@ class AsianArithmeticOption(Instrument):
     strike: float
     callput: Literal["call", "put"] = "call"
 
-    # If None, defaults to averaging over the model grid (exclude t=0 by default)
+    # If obs_times is None, defaults to averaging over the model grid.
     obs_times: Optional[ArrayF] = None
+    # Exclude t=0 by default.
     include_t0: bool = False
 
     # Interpolation for off-grid sampling, default "linear".
     interp: Literal["ladder", "linear"] = "linear"
     tol: float = 1e-12
-
+    
+    # Payoff of Asian option.
     def payoff(self, paths: PathBundle) -> ArrayF:
-        # Optional strictness: ensure maturity matches last time of simulated grid
+        # Ensure maturity matches grid end time
         T_grid = float(paths.t[-1])
         if abs(T_grid - float(self.maturity)) > self.tol:
             raise ValueError(

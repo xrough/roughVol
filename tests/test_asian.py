@@ -4,7 +4,6 @@ import pytest
 from roughvol.types import PathBundle
 from roughvol.instruments.asian import AsianArithmeticOption
 
-
 def make_paths_linear():
     # Spot is linear in time on each interval so linear interpolation is exact
     t = np.array([0.0, 1.0, 2.0])
@@ -13,7 +12,6 @@ def make_paths_linear():
         [100.0,  90.0,  80.0],  # decreases by 10 per unit time
     ])
     return PathBundle(t=t, state={"spot": spot})
-
 
 def test_asian_offgrid_linear_interp():
     paths = make_paths_linear()

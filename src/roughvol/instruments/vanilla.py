@@ -26,14 +26,6 @@ class VanillaOption:
         '''
         
         spot_T = np.asarray(paths.spot_T, dtype=float)  # PathBundle provides spot_T :contentReference[oaicite:3]{index=3}
-        return self.payoff_terminal(spot_T)
-
-    def payoff_terminal(self, spot_T: ArrayF) -> ArrayF:
-        '''
-        Terminal-only payoff (legacy-compatible).
-        '''
-        spot_T = np.asarray(spot_T, dtype=float)
-
         # Allow either shape (n_paths,) or (n_paths, 1) and normalize
         if spot_T.ndim == 2 and spot_T.shape[1] == 1:
             spot_T = spot_T[:, 0]

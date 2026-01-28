@@ -1,5 +1,6 @@
 '''
-Example script to run a GBM Monte Carlo surface experiment with prescribed market parameters.
+Example script to run a GBM Monte Carlo surface experiment 
+with prescribed market parameters and Vanilla European Call.
 '''
 
 from __future__ import annotations
