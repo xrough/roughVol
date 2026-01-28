@@ -127,7 +127,7 @@ class PathBundle:
         self,
         times: ArrayF,
         *,
-        method: Literal["previous", "linear"] = "linear",
+        method: Literal["ladder", "linear"] = "linear",
         tol: float = 1e-12,
     ) -> ArrayF:
         '''
@@ -139,7 +139,7 @@ class PathBundle:
         times:
             1D array of query times in [t[0], t[-1]].
         method:
-            "previous": left-continuous piecewise-constant (ladder) interpolation
+            "ladder": left-continuous piecewise-constant (ladder) interpolation
             "linear": piecewise-linear interpolation
         tol:
             tolerance for boundary handling (e.g., t[-1]).
@@ -174,7 +174,7 @@ class PathBundle:
         idx = np.searchsorted(t_grid, q, side="right") - 1
         idx = np.clip(idx, 0, len(t_grid) - 2)  # last interval is [n-2, n-1]
 
-        if method == "previous":
+        if method == "ladder":
             # left-continuous: S(q) = S(t[idx])
             return S[:, idx]
 
@@ -192,7 +192,7 @@ class PathBundle:
             w = (q - tL) / denom       # (m,)
             return SL + (SR - SL) * w  # broadcasts w across paths
 
-        raise ValueError(f"Unknown method: {method!r}. Use 'previous' or 'linear'.")
+        raise ValueError(f"Unknown method: {method!r}. Use 'ladder' or 'linear'.")
 
 # ============================================================================
 # Pricing output

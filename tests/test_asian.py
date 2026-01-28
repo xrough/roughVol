@@ -30,10 +30,10 @@ def test_asian_offgrid_linear_interp():
 def test_asian_offgrid_previous_interp():
     paths = make_paths_linear()
     obs = np.array([0.5, 1.5])
-    inst = AsianArithmeticOption(maturity=2.0, strike=100.0, callput="call", obs_times=obs, interp="previous")
+    inst = AsianArithmeticOption(maturity=2.0, strike=100.0, callput="call", obs_times=obs, interp="ladder")
     payoff = inst.payoff(paths)
 
-    # "previous" uses left endpoint values:
+    # "ladder" uses left endpoint values:
     # at 0.5 -> t=0 spot; at 1.5 -> t=1 spot
     # Path1: avg=(100+110)/2=105 -> payoff=5
     # Path2: avg=(100+ 90)/2=95  -> payoff=0

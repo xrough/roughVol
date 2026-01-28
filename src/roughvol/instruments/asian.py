@@ -32,14 +32,12 @@ class AsianArithmeticOption(Instrument):
     obs_times: Optional[ArrayF] = None
     include_t0: bool = False
 
-    # Interpolation for off-grid sampling:
-    interp: Literal["previous", "linear"] = "linear"
+    # Interpolation for off-grid sampling, default "linear".
+    interp: Literal["ladder", "linear"] = "linear"
     tol: float = 1e-12
 
     def payoff(self, paths: PathBundle) -> ArrayF:
         # Optional strictness: ensure maturity matches last time of simulated grid
-        # If you want fully general behavior, you can relax this check,
-        # but then you must define what "maturity" means if grid extends beyond it.
         T_grid = float(paths.t[-1])
         if abs(T_grid - float(self.maturity)) > self.tol:
             raise ValueError(
