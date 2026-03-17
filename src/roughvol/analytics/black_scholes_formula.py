@@ -1,13 +1,14 @@
 '''
-Black-Scholes的分析模型，deterministic，包含一个bs公式函数和一个vol的计算函数，由单调性寻找vol的预估值。作为MC的benchmark。
 The Black–Scholes formula prices a European option as the discounted expected payoff at maturity, 
 assuming lognormal asset prices with constant volatility.
+
+Benchmark implementation for European option pricing and implied volatility calculation.
 '''
 
 from __future__ import annotations
 
 import math
-from scipy.stats import norm # 正太
+from scipy.stats import norm # normal distribution.
 
 def bs_price(*, spot: float, strike: float, maturity: float, rate: float, div: float, vol: float, is_call: bool) -> float:
     '''
@@ -36,8 +37,43 @@ def bs_price(*, spot: float, strike: float, maturity: float, rate: float, div: f
     return strike * disc_r * norm.cdf(-d2) - spot * disc_q * norm.cdf(-d1) #经典BS公式
 
 
+def bs_delta(
+    *,
+    spot: float,
+    strike: float,
+    maturity: float,
+    rate: float,
+    div: float,
+    vol: float,
+    is_call: bool,
+) -> float:
+    """Closed-form Black-Scholes delta with continuous dividend yield."""
+    if maturity <= 0:
+        if is_call:
+            return 1.0 if spot > strike else 0.0
+        return -1.0 if spot < strike else 0.0
+    if vol < 0:
+        raise ValueError("vol must be non-negative.")
+    if spot <= 0 or strike <= 0:
+        raise ValueError("spot and strike must be positive.")
+    if vol == 0.0:
+        fwd = spot * math.exp((rate - div) * maturity)
+        if is_call:
+            return math.exp(-div * maturity) if fwd > strike else 0.0
+        return -math.exp(-div * maturity) if fwd < strike else 0.0
+
+    sqrtT = math.sqrt(maturity)
+    d1 = (math.log(spot / strike) + (rate - div + 0.5 * vol * vol) * maturity) / (
+        vol * sqrtT
+    )
+    disc_q = math.exp(-div * maturity)
+    if is_call:
+        return disc_q * norm.cdf(d1)
+    return disc_q * (norm.cdf(d1) - 1.0)
+
+
 '''
-implied vol在BS中可以直接求解，但是一般模型中找它是ill-posedness，需要restriction。
+Implied volatility calculation via bisection method, solvable since BS price is monotonic in vol.
 '''
 
 def implied_vol(*, price: float, spot: float, strike: float, maturity: float, rate: float, div: float, is_call: bool) -> float:

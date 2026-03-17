@@ -1,65 +1,114 @@
+'''
+MC engine for possibly path-dependent instruments and various models.
+
+Key contracts (see roughvol.types):
+- model.simulate_paths(market=..., sim=..., rng=...) -> PathBundle
+- payoff resolved via compute_payoff(instrument, paths)
+- discounting via MarketData.rate and flat_discount_factor
+'''
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 import numpy as np
 
-from roughvol.types import Instrument, PathModel, PriceResult
+
+from roughvol.types import (
+    Instrument,
+    PathModel,
+    MarketData,
+    SimConfig,
+    PriceResult,
+    PathBundle,
+    ArrayF,
+    compute_payoff,
+    make_rng,
+    flat_discount_factor,
+)
 
 
-@dataclass(frozen=True) # 使得包含的数据不能更改。
+
+@dataclass(frozen=True)
 class MonteCarloEngine:
     '''
-    Monte Carlo pricer for instruments whose payoff depends on terminal spot S_T.
-
-    Design:
-    - model produces paths
-    - instrument turns terminal spots into payoffs
-    - engine discounts and aggregates
+    Monte Carlo engine:
+    - n_paths/n_steps/seed/antithetic/scheme/store_paths are engine defaults.
+      The engine packages them into SimConfig and passes to the model.
+    - price function: given model, instrument, market, return PriceResult.
     '''
+    
     n_paths: int = 200_000
     n_steps: int = 200
     seed: int | None = 0
-    
-    '''
-    在Type中我们通过Protocol规定了一个PathModel必须具有的属性，所以进入引擎的model必须满足这些基本条件。
-    在这里就是它需要一个simulate_paths函数。注意：函数名称必须一致！
-    '''
+    antithetic: bool = True
+    scheme: str = "euler"
+    store_paths: bool = True
+    # price method: given model, instrument, market, return PriceResult
+    def price(
+        self,
+        *,
+        model: PathModel,
+        instrument: Instrument,
+        market: MarketData,
+    ) -> PriceResult:
+        # --- sanity checks (engine-level) ---
+        if self.n_paths < 1:
+            raise ValueError("n_paths must be >= 1")
+        if self.n_steps < 1:
+            raise ValueError("n_steps must be >= 1")
+        if instrument.maturity < 0:
+            raise ValueError("instrument.maturity must be non-negative")
+        if market.spot <= 0:
+            raise ValueError("market.spot must be positive")
 
-    def price(self, *, model: PathModel, instrument: Instrument) -> PriceResult:
-        # 1) RNG lives in the engine so runs are reproducible by seed
-        rng = np.random.default_rng(self.seed)
-
-        # 2) simulate full paths under the chosen model
-        paths = model.simulate_paths(
+        # --- Build simulation config (the model consumes this) ---
+        sim = SimConfig(
             n_paths=self.n_paths,
-            n_steps=self.n_steps,
             maturity=instrument.maturity,
-            rng=rng,
-        )
+            n_steps=self.n_steps,
+            seed=self.seed,
+            antithetic=self.antithetic,
+            scheme=self.scheme,
+            store_paths=self.store_paths,
+        )  # SimConfig.grid() defined in types.py 
 
-        # 3) terminal spots (European payoff)
-        spot_T = paths[:, -1] #-1指倒数第一个
+        rng = make_rng(sim.seed)  # standardized RNG helper 
 
-        # 4) compute pathwise payoffs using the instrument 
-        payoffs = instrument.payoff(spot_T) # 不需要明确class 
+        # --- Simulate paths ---
+        paths: PathBundle = model.simulate_paths(market=market, sim=sim, rng=rng)  
 
-        # 5) discount to time 0
-        # For now assume model exposes constant risk-free rate as attribute `rate`
-        r = float(getattr(model, "rate", 0.0)) # getattr是自带的函数，返回model.rate若存在，反之返回0.0
-        disc = np.exp(-r * instrument.maturity)
+        # --- Compute payoff ---
+        payoff: ArrayF = compute_payoff(instrument, paths)  
+        payoff = np.asarray(payoff, dtype=float).reshape(-1)
 
-        discounted = disc * payoffs # 折损
+        # --- Discount ---
+        df = flat_discount_factor(float(market.rate), float(instrument.maturity))  # 
+        pv = df * payoff
 
-        # 6) estimator: mean and standard error
-        price = float(discounted.mean())
-        stderr = float(discounted.std(ddof=1) / np.sqrt(self.n_paths)) # .std(ddof=1): sample standard deviation
-        ci95 = ((price - 1.96 * stderr, price + 1.96 * stderr))
+        # --- MC stats ---
+        n = int(pv.size)
+        if n == 0:
+            raise ValueError("No payoffs produced (n_paths=0?)")
+
+        price = float(pv.mean())
+        if n > 1:
+            stderr = float(pv.std(ddof=1) / np.sqrt(n))
+            ci95 = (price - 1.96 * stderr, price + 1.96 * stderr)
+        else:
+            stderr = 0.0
+            ci95 = (price, price)
 
         return PriceResult(
             price=price,
             stderr=stderr,
-            n_paths=self.n_paths,
-            n_steps=self.n_steps,
+            ci95=(float(ci95[0]), float(ci95[1])),
+            n_paths=n,
+            n_steps=int(paths.n_times - 1),  # realized from PathBundle grid 
             seed=self.seed,
-            ci95=ci95
+            metadata={
+                "df": df,
+                "antithetic": bool(sim.antithetic),
+                "scheme": sim.scheme,
+                "store_paths": bool(sim.store_paths),
+            },
         )

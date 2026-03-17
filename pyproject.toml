@@ -23,3 +23,10 @@ dev = [
   "pytest",
   "ruff",
 ]
+grpc = [
+  "grpcio>=1.60",
+  "grpcio-tools>=1.60",
+]
+
+[project.scripts]
+rough-pricing-server = "roughvol.service.server:main"

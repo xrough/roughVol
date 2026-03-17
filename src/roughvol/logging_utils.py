@@ -1,9 +1,6 @@
 from __future__ import annotations
 from pathlib import Path # 文件路径
 import logging
-'''
-Logging utility记录开发过程中的code运行。替代了print等函数的功能，更专业化。与Project本身无关。
-'''
 def configure_console_logging(
     *,
     level: int = logging.INFO,
@@ -11,10 +8,11 @@ def configure_console_logging(
     datefmt: str = "%H:%M:%S",
 ) -> None:
     '''
-    Configure root logging once for scripts/experiments.
-
+    Logging utility, set up console logging for scripts.
+    
     Library code should NOT call this automatically.
-    Only call it from entry points (experiments, scripts, CLI).'''
+    Only call it from entry points (experiments, scripts, CLI).
+    '''
     
     root = logging.getLogger() # returns root logger
     if root.handlers:
@@ -63,6 +61,7 @@ def add_file_handlers(
         fh_err.setFormatter(formatter)
         root.addHandler(fh_err)
 
+
 '''
 Loggers是分层的对象，可以释放log信息，handler决定log信息去哪里（handler只应该存在在应用入口，而不应该在library code中）。Logger的等级包括：
 DEBUG    – Diagnostic detail
@@ -73,5 +72,4 @@ CRITICAL – System is unusable
 Pythong中对应一个固定的整数。
 
 logging.info()等函数创造log信息，logging.basicConfig()决定最低等级的log信息，以上的会被输出看到。
-
 '''

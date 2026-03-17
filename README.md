@@ -20,143 +20,127 @@ After cloning:
 git clone <your-repo>
 cd <your-repo>
 python3 scripts/setup.py
-
----
-
-## What This Project Does
-
-This project implements and studies three advanced extensions to standard volatility models:
-
-### 1. Markovian Approximations of Rough Volatility
-
-Turning non-Markovian rough models into finite-dimensional, tractable systems.
-
-### 2. Multilevel Monte Carlo (MLMC)
-
-Reducing the computational cost of Monte Carlo pricing while controlling error.
-
-### 3. Rough Heston Pricing via Fourier Methods
-
-Using fractional dynamics and fast transform-based pricing instead of brute-force simulation.
-
-All methods are validated through **convergence studies**, **performance benchmarks**, and **reproducible experiments**.
-
----
-
-## Why This Project Exists
-
-Classic models like Black–Scholes and Heston are computationally convenient but empirically weak.
-Rough volatility models are empirically strong but numerically difficult.
-
-This project explores how to make modern models usable in practice by addressing:
-
-* Computational cost
-* Numerical stability
-* Approximation error
-* Algorithmic complexity
-* Reproducibility
-
----
-
-## Core Features
-
-### Models
-
-* Black–Scholes (baseline)
-* Heston
-* Rough Bergomi (Monte Carlo)
-* Rough Heston (transform-based)
-* Markovian-lifted rough models
-
-### Pricing Engines
-
-* Standard Monte Carlo
-* Multilevel Monte Carlo (MLMC)
-* Fourier/COS pricing
-
-### Instruments
-
-* Vanilla European options (primary focus)
-* Path-dependent options (optional extensions)
-
-### Analytics
-
-* Implied volatility
-* Greeks
-* Variance reduction
-* Classical calibration (non-ML)
-
----
-
-## Key Contributions
-
-### 1. Markovian Lift of Rough Volatility
-
-Transforms rough, non-Markovian models into finite-dimensional systems that are:
-
-* Faster to simulate
-* Easier to calibrate
-* Compatible with PDE-based methods
-
-Includes full **accuracy vs speed tradeoff analysis**.
-
----
-
-### 2. Multilevel Monte Carlo (MLMC)
-
-Implements MLMC for rough volatility pricing, including:
-
-* Level coupling
-* Adaptive sampling
-* Bias/variance control
-
-Demonstrates **real complexity reduction** compared to naive Monte Carlo.
-
----
-
-### 3. Rough Heston with Transform Pricing
-
-Implements a semi-analytic pricing route for rough Heston:
-
-* Fractional dynamics solvers
-* Fourier-based pricing (COS method)
-* Stability and convergence analysis
-
----
-
-## Repository Structure
-
 ```
-rough-volatility-lab/
-  src/roughvol/
-    models/
-    kernels/
-    sim/
-    engines/
-    instruments/
-    analytics/
-    experiments/
-  tests/
-  docs/
-  notebooks/
+---
+
+## The current stage
+
+```text
+We have built so far a simple pricing project with the following structure tree:
+.
+├── .gitignore
+├── LICENSE
+├── Makefile
+├── README.md
+├── Schedule.text
+├── notebooks
+│   ├── Py_note.ipynb
+│   ├── pricing_research.ipynb
+│   └── roughvol_research copy.ipynb
+├── pyproject.toml
+├── scripts
+│   └── setup.py
+├── src
+│   └── roughvol
+│       ├── analytics
+│       │   └── black_scholes_formula.py
+│       ├── engines
+│       │   └── mc.py
+│       ├── experiments
+│       │   └── run_surface.py
+│       ├── instruments
+│       │   └── vanilla.py
+│       ├── logging_utils.py
+│       ├── models
+│       │   └── GBM_model.py
+│       ├── sim
+│       │   └── brownian.py
+│       └── types.py
+└── tests
+    ├── test_MC.py
+    ├── test_antithetic.py
+    └── test_sanity.py
+```
+## Next steps for this branch
+
+### Types
+
+```text
+types.py
+└── Core architecture
+    ├── Data containers (dataclasses: concrete schemas)
+    │   ├── MarketData
+    │   │   ├── spot: float, spot price at zero
+    │   │   ├── rate: float
+    │   │   ├── div_yield: float
+    │   │   ├── discount_curve: Any | None
+    │   │   ├── forward_variance_curve: Callable[[ArrayF], ArrayF] | None # conditional expectation of variance process under the risk-neutral measure. 
+    │   │   └── metadata: Mapping[str, Any]
+    │   │
+    │   ├── SimConfig
+    │   │   ├── n_paths: int
+    │   │   ├── maturity: float
+    │   │   ├── n_steps: int | None
+    │   │   ├── time_grid: ArrayF | None
+    │   │   ├── seed: int | None
+    │   │   ├── antithetic: bool
+    │   │   ├── scheme: str
+    │   │   ├── store_paths: bool
+    │   │   ├── metadata: Mapping[str, Any]
+    │   │   └── method: grid() -> ArrayF
+    │   │
+    │   ├── PathBundle
+    │   │   ├── t: ArrayF
+    │   │   ├── state: Mapping[str, ArrayF]
+    │   │   │   └── required key: "spot" -> ArrayF (n_paths, n_times)
+    │   │   ├── extras: Mapping[str, ArrayF]
+    │   │   ├── metadata: Mapping[str, Any]
+    │   │   ├── method: __post_init__()  (validates invariants)
+    │   │   └── properties (derived facts)
+    │   │       ├── spot -> ArrayF
+    │   │       ├── spot_T -> ArrayF
+    │   │       ├── n_paths -> int
+    │   │       ├── n_times -> int
+    │   │       └── get(name: str) -> ArrayF
+    │   │
+    │   └── PriceResult
+    │       ├── price: float
+    │       ├── stderr: float
+    │       ├── ci95: tuple[float, float]
+    │       ├── n_paths: int
+    │       ├── n_steps: int
+    │       ├── seed: int | None
+    │       └── metadata: Mapping[str, Any]
+    │
+    ├── Capability boundaries (Protocols: behavioral contracts)
+    │   ├── Instrument
+    │   │   ├── maturity: float
+    │   │   └── payoff(paths: PathBundle) -> ArrayF
+    │   │
+    │   ├── TerminalInstrument (legacy support)
+    │   │   ├── maturity: float
+    │   │   └── payoff_terminal(spot_T: ArrayF) -> ArrayF
+    │   │
+    │   └── PathModel
+    │       └── simulate_paths(market: MarketData, sim: SimConfig, rng: Generator) -> PathBundle
+    │
+    └── Adapter / utility functions (glue)
+        ├── compute_payoff(instrument, paths) -> ArrayF
+        │   ├── tries Instrument.payoff(paths)
+        │   ├── else tries TerminalInstrument.payoff_terminal(spot_T)
+        │   └── else tries legacy payoff(spot_T)
+        ├── make_rng(seed) -> Generator
+        └── flat_discount_factor(rate, t) -> float
 ```
 
----
+### Instrument
 
-## Reproducible Experiments
+We include now path-dependent instrument like asian options as we have now a flexible structure with PathBundle and SimConfig. We remark some major technical point of the extensions: 
 
-This project emphasizes **numerical credibility**.
+- Due to time discretization, it must be ensured that the observation times may not align with the  simulation grid. We could either of the following: 
+    - interpolate the simulation grid,
+    - require the observation times to lie on the grid.
 
-Key experiments:
-
-* MLMC vs standard Monte Carlo cost comparison
-* Markovian lift accuracy vs number of factors
-* Rough Heston solver stability and convergence
-* Implied volatility surface generation
-
-All experiments are fully scriptable and configuration-driven.
-
----
-
-
-
+To be able to include them, we
+- create a method named spot_at in PathBundle to interpolate the spot price,
+- 
