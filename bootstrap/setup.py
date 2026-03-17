@@ -1,3 +1,5 @@
+# Setup script to create a virtual environment and install dependencies for the Rough-Pricing project.
+
 import os
 import platform
 import subprocess
