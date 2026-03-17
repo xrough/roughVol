@@ -37,6 +37,41 @@ def bs_price(*, spot: float, strike: float, maturity: float, rate: float, div: f
     return strike * disc_r * norm.cdf(-d2) - spot * disc_q * norm.cdf(-d1) #经典BS公式
 
 
+def bs_delta(
+    *,
+    spot: float,
+    strike: float,
+    maturity: float,
+    rate: float,
+    div: float,
+    vol: float,
+    is_call: bool,
+) -> float:
+    """Closed-form Black-Scholes delta with continuous dividend yield."""
+    if maturity <= 0:
+        if is_call:
+            return 1.0 if spot > strike else 0.0
+        return -1.0 if spot < strike else 0.0
+    if vol < 0:
+        raise ValueError("vol must be non-negative.")
+    if spot <= 0 or strike <= 0:
+        raise ValueError("spot and strike must be positive.")
+    if vol == 0.0:
+        fwd = spot * math.exp((rate - div) * maturity)
+        if is_call:
+            return math.exp(-div * maturity) if fwd > strike else 0.0
+        return -math.exp(-div * maturity) if fwd < strike else 0.0
+
+    sqrtT = math.sqrt(maturity)
+    d1 = (math.log(spot / strike) + (rate - div + 0.5 * vol * vol) * maturity) / (
+        vol * sqrtT
+    )
+    disc_q = math.exp(-div * maturity)
+    if is_call:
+        return disc_q * norm.cdf(d1)
+    return disc_q * (norm.cdf(d1) - 1.0)
+
+
 '''
 Implied volatility calculation via bisection method, solvable since BS price is monotonic in vol.
 '''
