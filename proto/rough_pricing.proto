@@ -33,6 +33,13 @@ message HestonParams {
   double v0    = 5;
 }
 
+message RoughBergomiParams {
+  double hurst = 1;
+  double eta   = 2;
+  double rho   = 3;
+  double xi0   = 4;
+}
+
 // ── Market data message ────────────────────────────────────────────────────
 
 message MarketData {
@@ -45,8 +52,9 @@ message MarketData {
 
 message MCPriceRequest {
   oneof model {
-    GBMParams    gbm    = 1;
-    HestonParams heston = 2;
+    GBMParams           gbm            = 1;
+    HestonParams        heston         = 2;
+    RoughBergomiParams  rough_bergomi  = 10;
   }
   oneof instrument {
     VanillaInstrument vanilla = 3;
@@ -115,9 +123,10 @@ message TimedOptionQuote {
 }
 
 enum ModelType {
-  BS      = 0;
-  GBM_MC  = 1;
-  HESTON  = 2;
+  BS             = 0;
+  GBM_MC         = 1;
+  HESTON         = 2;
+  ROUGH_BERGOMI  = 3;
 }
 
 message CalibrateRequest {
@@ -126,7 +135,8 @@ message CalibrateRequest {
   repeated OptionQuote quotes      = 3;
   double               rate        = 4;
   double               div         = 5;
-  // optional warm-start: first element is x0_sigma for GBM; full 5-vec for Heston
+  // optional warm-start: first element is x0_sigma for GBM;
+  // full 5-vec for Heston; 4-vec (hurst, eta, rho, xi0) for rough Bergomi
   repeated double      x0          = 6;
   // MC engine config (0 → server defaults)
   int32  n_paths      = 7;

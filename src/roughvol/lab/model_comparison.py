@@ -11,6 +11,7 @@ from roughvol.engines.mc import MonteCarloEngine
 from roughvol.instruments.vanilla import VanillaOption
 from roughvol.models.GBM_model import GBM_Model
 from roughvol.models.heston_model import HestonModel
+from roughvol.models.rough_bergomi_model import RoughBergomiModel
 from roughvol.service.calibration import CalibResult
 from roughvol.service.toolbox import CalibrationToolbox
 from roughvol.types import MarketData, SimConfig, make_rng
@@ -436,5 +437,12 @@ def _make_path_model(*, model_name: str, params: dict[str, float]) -> object:
             xi=float(params["xi"]),
             rho=float(params["rho"]),
             v0=float(params["v0"]),
+        )
+    if model_name == "ROUGH_BERGOMI":
+        return RoughBergomiModel(
+            hurst=float(params["hurst"]),
+            eta=float(params["eta"]),
+            rho=float(params["rho"]),
+            xi0=float(params["xi0"]),
         )
     raise ValueError(f"Model {model_name!r} does not define path dynamics")

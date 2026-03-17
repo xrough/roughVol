@@ -8,8 +8,8 @@ The project is no longer just a minimal Monte Carlo sandbox. It currently includ
 
 - Monte Carlo pricing for vanilla and Asian options
 - Black-Scholes analytics for pricing, implied volatility, and delta
-- Path models for `GBM` and `Heston`
-- Calibration utilities for `BS`, `GBM_MC`, and `HESTON`
+- Path models for `GBM`, `Heston`, and `Rough Bergomi`
+- Calibration utilities for `BS`, `GBM_MC`, `HESTON`, and `ROUGH_BERGOMI`
 - A gRPC service with proto definitions for pricing, implied vol, and calibration
 - A windowed calibration toolbox for time-bucketed parameter updates
 - A research lab for comparing models by volatility-surface fit and delta-hedging PnL
@@ -95,6 +95,7 @@ Implemented models:
 
 - `GBM_Model`
 - `HestonModel`
+- `RoughBergomiModel`
 
 Both expose `simulate_paths(...) -> PathBundle` and run through the common Monte Carlo engine.
 

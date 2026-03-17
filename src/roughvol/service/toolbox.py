@@ -10,6 +10,7 @@ from roughvol.service.calibration import (
     CalibResult,
     make_gbm_calibrator,
     make_heston_calibrator,
+    make_rough_bergomi_calibrator,
 )
 
 
@@ -17,6 +18,7 @@ MODEL_TYPE_NAMES: dict[int, str] = {
     0: "BS",
     1: "GBM_MC",
     2: "HESTON",
+    3: "ROUGH_BERGOMI",
 }
 
 
@@ -75,6 +77,14 @@ class CalibrationToolbox:
         if model_name == "HESTON":
             cal = make_heston_calibrator(
                 x0_sigma=x0[0] if x0 else 0.20,
+                engine_kwargs=engine_kwargs,
+            )
+            return cal.calibrate(spot, options_df, rate, div)
+
+        if model_name == "ROUGH_BERGOMI":
+            cal = make_rough_bergomi_calibrator(
+                x0_sigma=x0[0] if x0 else 0.20,
+                x0=x0 if x0 else None,
                 engine_kwargs=engine_kwargs,
             )
             return cal.calibrate(spot, options_df, rate, div)

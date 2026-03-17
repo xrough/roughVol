@@ -25,6 +25,7 @@ from roughvol.analytics.black_scholes_formula import bs_price, implied_vol
 from roughvol.engines.mc import MonteCarloEngine
 from roughvol.models.GBM_model import GBM_Model
 from roughvol.models.heston_model import HestonModel
+from roughvol.models.rough_bergomi_model import RoughBergomiModel
 from roughvol.instruments.vanilla import VanillaOption
 from roughvol.instruments.asian import AsianArithmeticOption
 from roughvol.types import MarketData
@@ -49,6 +50,11 @@ class RoughVolServicer(pb2_grpc.RoughPricingServiceServicer):
             h = request.heston
             model = HestonModel(
                 kappa=h.kappa, theta=h.theta, xi=h.xi, rho=h.rho, v0=h.v0
+            )
+        elif model_field == "rough_bergomi":
+            rb = request.rough_bergomi
+            model = RoughBergomiModel(
+                hurst=rb.hurst, eta=rb.eta, rho=rb.rho, xi0=rb.xi0
             )
         else:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "No model specified")

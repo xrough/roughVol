@@ -10,6 +10,7 @@ Three calibrators with a uniform interface:
   MCCalibrator       — generic MC calibrator via MonteCarloEngine
   make_gbm_calibrator    — factory for 1-param GBM calibrator
   make_heston_calibrator — factory for 5-param Heston calibrator
+  make_rough_bergomi_calibrator — factory for 4-param rough Bergomi calibrator
 
 All calibrators accept a pandas DataFrame with columns:
   strike, maturity_years, is_call, market_price
@@ -245,6 +246,39 @@ def make_heston_calibrator(
         ],
         x0=[2.0, v0_guess, 0.3, -0.5, v0_guess],
         engine_kwargs=engine_kwargs or {"n_paths": 20_000, "n_steps": 50, "seed": 42, "antithetic": True},
+    )
+
+
+def make_rough_bergomi_calibrator(
+    x0_sigma: float = 0.20,
+    x0: list[float] | None = None,
+    engine_kwargs: dict | None = None,
+) -> MCCalibrator:
+    """MCCalibrator for RoughBergomiModel (4 params)."""
+    from roughvol.models.rough_bergomi_model import RoughBergomiModel
+
+    default_x0 = [0.1, 1.5, -0.7, x0_sigma ** 2]
+    raw_x0 = list(x0) if x0 else default_x0
+    if len(raw_x0) != 4:
+        raise ValueError("rough Bergomi warm start x0 must have four values")
+
+    return MCCalibrator(
+        model_name="RoughBergomi",
+        model_factory=lambda x: RoughBergomiModel(
+            hurst=float(x[0]),
+            eta=float(x[1]),
+            rho=float(x[2]),
+            xi0=float(x[3]),
+        ),
+        param_names=["hurst", "eta", "rho", "xi0"],
+        bounds=[
+            (1e-3, 0.499),  # hurst
+            (1e-3, 5.0),    # eta
+            (-0.99, 0.99),  # rho
+            (1e-5, 1.0),    # xi0
+        ],
+        x0=raw_x0,
+        engine_kwargs=engine_kwargs or {"n_paths": 8_000, "n_steps": 64, "seed": 42, "antithetic": True},
     )
 
 
