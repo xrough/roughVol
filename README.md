@@ -1,146 +1,179 @@
 # Stochastic and Rough Volatility Lab
 
-**Numerical Methods for Advanced Volatility Modeling in Python**
+Python framework for derivative pricing, calibration, and model comparison under classical and stochastic-volatility models, with a gRPC/proto boundary intended to plug into a larger pricing engine.
 
-This repository is a **research-grade Python framework** for derivative pricing under modern volatility models.
+## Current Status
 
----
+The project is no longer just a minimal Monte Carlo sandbox. It currently includes:
 
-## Installation
+- Monte Carlo pricing for vanilla and Asian options
+- Black-Scholes analytics for pricing, implied volatility, and delta
+- Path models for `GBM` and `Heston`
+- Calibration utilities for `BS`, `GBM_MC`, and `HESTON`
+- A gRPC service with proto definitions for pricing, implied vol, and calibration
+- A windowed calibration toolbox for time-bucketed parameter updates
+- A research lab for comparing models by volatility-surface fit and delta-hedging PnL
+
+What is not implemented yet:
+
+- A true rough-volatility path model in the production model registry
+- C++ integration code on the engine side
+- Persistent calibration state outside the Python service process
+
+## Repository Layout
+
+```text
+.
+├── Makefile
+├── README.md
+├── bootstrap/
+│   └── setup.py
+├── generated/
+│   └── python/
+├── notebooks/
+├── proto/
+│   └── rough_pricing.proto
+├── src/
+│   └── roughvol/
+│       ├── analytics/      # Black-Scholes pricing, IV, delta
+│       ├── data/           # market-data schema/provider scaffolding
+│       ├── engines/        # Monte Carlo engine
+│       ├── experiments/    # runnable research scripts
+│       ├── instruments/    # vanilla and Asian contracts
+│       ├── lab/            # model comparison and hedge-PnL lab
+│       ├── models/         # GBM and Heston path models
+│       ├── service/        # calibration + gRPC service layer
+│       ├── sim/            # Brownian drivers
+│       └── types.py        # shared contracts and containers
+└── tests/
+```
+
+## Setup
+
+Clone the repo and create the environment:
 
 ```bash
 git clone https://github.com/jixh-KPZ-1020/Rough-Pricing.git
+cd Rough-Pricing
+python3 bootstrap/setup.py
 ```
 
-## Venv
-
-After cloning:
+Or use the `Makefile`:
 
 ```bash
-git clone <your-repo>
-cd <your-repo>
-python3 scripts/setup.py
-```
----
-
-## The current stage
-
-```text
-We have built so far a simple pricing project with the following structure tree:
-.
-├── .gitignore
-├── LICENSE
-├── Makefile
-├── README.md
-├── Schedule.text
-├── notebooks
-│   ├── Py_note.ipynb
-│   ├── pricing_research.ipynb
-│   └── roughvol_research copy.ipynb
-├── pyproject.toml
-├── scripts
-│   └── setup.py
-├── src
-│   └── roughvol
-│       ├── analytics
-│       │   └── black_scholes_formula.py
-│       ├── engines
-│       │   └── mc.py
-│       ├── experiments
-│       │   └── run_surface.py
-│       ├── instruments
-│       │   └── vanilla.py
-│       ├── logging_utils.py
-│       ├── models
-│       │   └── GBM_model.py
-│       ├── sim
-│       │   └── brownian.py
-│       └── types.py
-└── tests
-    ├── test_MC.py
-    ├── test_antithetic.py
-    └── test_sanity.py
-```
-## Next steps for this branch
-
-### Types
-
-```text
-types.py
-└── Core architecture
-    ├── Data containers (dataclasses: concrete schemas)
-    │   ├── MarketData
-    │   │   ├── spot: float, spot price at zero
-    │   │   ├── rate: float
-    │   │   ├── div_yield: float
-    │   │   ├── discount_curve: Any | None
-    │   │   ├── forward_variance_curve: Callable[[ArrayF], ArrayF] | None # conditional expectation of variance process under the risk-neutral measure. 
-    │   │   └── metadata: Mapping[str, Any]
-    │   │
-    │   ├── SimConfig
-    │   │   ├── n_paths: int
-    │   │   ├── maturity: float
-    │   │   ├── n_steps: int | None
-    │   │   ├── time_grid: ArrayF | None
-    │   │   ├── seed: int | None
-    │   │   ├── antithetic: bool
-    │   │   ├── scheme: str
-    │   │   ├── store_paths: bool
-    │   │   ├── metadata: Mapping[str, Any]
-    │   │   └── method: grid() -> ArrayF
-    │   │
-    │   ├── PathBundle
-    │   │   ├── t: ArrayF
-    │   │   ├── state: Mapping[str, ArrayF]
-    │   │   │   └── required key: "spot" -> ArrayF (n_paths, n_times)
-    │   │   ├── extras: Mapping[str, ArrayF]
-    │   │   ├── metadata: Mapping[str, Any]
-    │   │   ├── method: __post_init__()  (validates invariants)
-    │   │   └── properties (derived facts)
-    │   │       ├── spot -> ArrayF
-    │   │       ├── spot_T -> ArrayF
-    │   │       ├── n_paths -> int
-    │   │       ├── n_times -> int
-    │   │       └── get(name: str) -> ArrayF
-    │   │
-    │   └── PriceResult
-    │       ├── price: float
-    │       ├── stderr: float
-    │       ├── ci95: tuple[float, float]
-    │       ├── n_paths: int
-    │       ├── n_steps: int
-    │       ├── seed: int | None
-    │       └── metadata: Mapping[str, Any]
-    │
-    ├── Capability boundaries (Protocols: behavioral contracts)
-    │   ├── Instrument
-    │   │   ├── maturity: float
-    │   │   └── payoff(paths: PathBundle) -> ArrayF
-    │   │
-    │   ├── TerminalInstrument (legacy support)
-    │   │   ├── maturity: float
-    │   │   └── payoff_terminal(spot_T: ArrayF) -> ArrayF
-    │   │
-    │   └── PathModel
-    │       └── simulate_paths(market: MarketData, sim: SimConfig, rng: Generator) -> PathBundle
-    │
-    └── Adapter / utility functions (glue)
-        ├── compute_payoff(instrument, paths) -> ArrayF
-        │   ├── tries Instrument.payoff(paths)
-        │   ├── else tries TerminalInstrument.payoff_terminal(spot_T)
-        │   └── else tries legacy payoff(spot_T)
-        ├── make_rng(seed) -> Generator
-        └── flat_discount_factor(rate, t) -> float
+make setup
 ```
 
-### Instrument
+## Development Commands
 
-We include now path-dependent instrument like asian options as we have now a flexible structure with PathBundle and SimConfig. We remark some major technical point of the extensions: 
+```bash
+make test
+make lint
+make proto-python
+make serve
+```
 
-- Due to time discretization, it must be ensured that the observation times may not align with the  simulation grid. We could either of the following: 
-    - interpolate the simulation grid,
-    - require the observation times to lie on the grid.
+`make proto-python` regenerates the Python stubs from [`proto/rough_pricing.proto`](proto/rough_pricing.proto).
 
-To be able to include them, we
-- create a method named spot_at in PathBundle to interpolate the spot price,
-- 
+## Implemented Components
+
+### Core Types
+
+[`src/roughvol/types.py`](src/roughvol/types.py) defines the project-wide contracts:
+
+- `MarketData`
+- `SimConfig`
+- `PathBundle`
+- `PriceResult`
+- `Instrument` and `PathModel` protocols
+
+This layer is the interface boundary between models, pricing engines, and instruments.
+
+### Models
+
+Implemented models:
+
+- `GBM_Model`
+- `HestonModel`
+
+Both expose `simulate_paths(...) -> PathBundle` and run through the common Monte Carlo engine.
+
+### Instruments
+
+Implemented instruments:
+
+- European vanilla options
+- Arithmetic Asian options
+
+The path container supports interpolation through `spot_at(...)`, which is used to handle observation dates that do not align exactly with the simulation grid.
+
+### Calibration
+
+[`src/roughvol/service/calibration.py`](src/roughvol/service/calibration.py) provides:
+
+- `BSCalibrator`
+- `MCCalibrator`
+- factory helpers for `GBM_MC` and `HESTON`
+
+[`src/roughvol/service/toolbox.py`](src/roughvol/service/toolbox.py) adds a windowed calibration layer intended for proto-connected engine updates:
+
+- fixed calibration window selection
+- update throttling via `update_interval_ms`
+- in-process caching of the last calibration snapshot
+
+### gRPC Service
+
+[`proto/rough_pricing.proto`](proto/rough_pricing.proto) and [`src/roughvol/service/`](src/roughvol/service/) expose:
+
+- `MCPrice`
+- `BSPrice`
+- `ImpliedVol`
+- `Calibrate`
+- `UpdateCalibrationWindow`
+
+`UpdateCalibrationWindow` is the calibration-toolbox entrypoint for latency-tolerant parameter refreshes over a fixed time window.
+
+### Research Lab
+
+[`src/roughvol/lab/model_comparison.py`](src/roughvol/lab/model_comparison.py) supports model benchmarking on:
+
+- price surface fit
+- implied-volatility fit
+- discrete delta-hedging PnL
+
+The main example runner is:
+
+```bash
+python -m roughvol.experiments.run_model_lab
+```
+
+Other experiment entrypoints:
+
+```bash
+python -m roughvol.experiments.run_vanilla
+python -m roughvol.experiments.run_asian
+python -m roughvol.experiments.run_compare_gbm_heston
+```
+
+## Testing
+
+Run the full test suite with:
+
+```bash
+pytest
+```
+
+The test suite currently covers:
+
+- Monte Carlo engine sanity and reproducibility
+- Asian option support
+- windowed calibration toolbox behavior
+- lab comparison output
+
+## Near-Term Direction
+
+The next meaningful extensions are:
+
+1. Add a true rough-volatility model to `src/roughvol/models/` and register it in calibration and lab workflows.
+2. Define the C++ consumer contract for `UpdateCalibrationWindow`, including asset identifiers, scheduling, and fallback behavior.
+3. Move calibration snapshots from in-memory cache to durable storage if the service must survive restarts.
