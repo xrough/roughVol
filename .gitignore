@@ -46,6 +46,11 @@ htmlcov/
 *.nbconvert.ipynb
 
 # =========================
+# Local project docs
+# =========================
+structure.md
+
+# =========================
 # OS / editor junk
 # =========================
 .DS_Store
