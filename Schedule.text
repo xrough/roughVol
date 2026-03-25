@@ -1,8 +1,0 @@
-Meeting 20.01.26
-pricing模型的理解，完成notebook，一个是pricing的基本模型和数值方法，二是rough volitility的文献阅读（stochastic vol v.s. rough vol.）
-底层函数建立，包括定价函数和随机simulation的方法
-完成package，experiment（data获取）
-
-分工
-CQ: rough and stoch vol, XH: pricing 
-CQ: MC, XH: pricing functions.
