@@ -44,7 +44,7 @@ These models are usually written as stochastic Volterra equations. The rough Hes
 $$
 \frac{dS_t}{S_t} = \sqrt{V_t} dW_t^{(1)},
 \qquad
-V_t = V_0 + \int_0^t K(t-s)\Big(\lambda(\theta - V_s)\,ds + \nu\sqrt{V_s} dW_s^{(2)}\Big),
+V_t = V_0 + \int_0^t K(t-s)\Big(\lambda(\theta - V_s) ds + \nu\sqrt{V_s} dW_s^{(2)}\Big),
 $$
 
 with
@@ -56,19 +56,19 @@ $$
 and
 
 $$
-d\langle W^{(1)},W^{(2)}\rangle_t = \rho\,dt.
+d\langle W^{(1)},W^{(2)}\rangle_t = \rho dt.
 $$
 
 An equivalent integrated-variance formulation uses
 
 $$
-X_t := \int_0^t V_s\,ds,
+X_t := \int_0^t V_s ds,
 $$
 
 and rewrites the dynamics in terms of \(X\) and the martingales
 
 $$
-M_t^{(i)} := \int_0^t \sqrt{V_s}\,dW_s^{(i)}.
+M_t^{(i)} := \int_0^t \sqrt{V_s} dW_s^{(i)}.
 $$
 
 ### 1.3 What counts as a distinct simulation method?
