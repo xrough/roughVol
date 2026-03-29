@@ -14,7 +14,7 @@ This note organizes the main simulation methods for rough volatility models by *
 These volatility models typically take the form
 
 $$
-V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s)dW_s,
+V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s) dW_s,
 $$
 
 with a singular Volterra kernel
@@ -26,7 +26,7 @@ $$
 and stock dynamics
 
 $$
-\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} gitdW_t^\perp.
+\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} dW_t^\perp.
 $$
 
 The canonical example is **rough Bergomi**:
