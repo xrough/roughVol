@@ -26,9 +26,7 @@ $$
 Mathematical intuition is the Mandelbrot–Van Ness formula:
 
 $$
-B_t^H
-=
-\frac{1}{\Gamma(H+1/2)}
+B_t^H = \frac{1}{\Gamma(H+1/2)}
 \left(
 \int_{-\infty}^0 \left((t-s)^{H-1/2}-(-s)^{H-1/2}\right)\,dW_s
 +
