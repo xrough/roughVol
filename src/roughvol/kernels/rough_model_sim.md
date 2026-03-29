@@ -112,7 +112,7 @@ $$
 from its covariance matrix, then reconstruct $V$ and $S$. More precisely, from
 
 $$
-\widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s, 
+\widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-\frac{1}{2}} dW_s, 
 $$
 
 we have for $s,t\ge 0$,
