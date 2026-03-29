@@ -244,12 +244,10 @@ This is the standard fast simulation method for rough Bergomi-type Gaussian driv
 
 ### Discrete formula
 
-On a grid $(t_i=\frac{i}{n})$, the hybrid approximation has the form
+On a grid $\left(t_i=\frac{i}{n}\right)$, the hybrid approximation has the form
 
 $$
-X_n(t_i)
-=
-\sum_{k=1}^{\kappa} L_g(k/n)\,\sigma_{i-k}^n\,W_{i-k,k}^n
+X_n(t_i) = \sum_{k=1}^{\kappa} L_g(k/n)\,\sigma_{i-k}^n\,W_{i-k,k}^n
 +
 \sum_{k=\kappa+1}^{N_n} g(b_k^*/n)\,\sigma_{i-k}^n\,W_{i-k}^n,
 $$
