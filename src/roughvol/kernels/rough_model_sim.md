@@ -35,7 +35,7 @@ V_t = \xi_0(t)\exp\left(\eta\widetilde W_t - \frac{\eta^2}{2}t^{2H}\right),
 \widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-\frac{1}{2}}dW_s.
 $$
 
-Another class of models are given by the affine Volterra / rough Heston-type: These models are usually written as stochastic Volterra equations. The rough Heston model is
+Another class of models are given by the **affine Volterra / rough Heston-type**: These models are usually written as stochastic Volterra equations. The rough Heston model is
 
 $$
 \frac{dS_t}{S_t} = \sqrt{V_t} dW_t^{(1)},
@@ -67,7 +67,7 @@ $$
 M_t^{(i)} := \int_0^t \sqrt{V_s} dW_s^{(i)}.
 $$
 
-### 1.3 What counts as a distinct simulation method?
+### What counts as a distinct simulation method?
 
 A useful classification is by **numerical mechanism**:
 
