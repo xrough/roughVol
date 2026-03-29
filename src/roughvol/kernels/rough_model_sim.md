@@ -12,7 +12,7 @@ This note organizes the main simulation methods for rough volatility models by *
 The general rough-vol model is a stochastic volatility model driven by a singular Volterra kernel; rough Bergomi is the Gaussian/lognormal special case, while rough Heston is the affine square-root Volterra special case. These volatility models typically take the form
 
 $$
-V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s) dW_s,
+V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s) dW_s + \text{drift if necessary},
 $$
 
 with a singular Volterra kernel
