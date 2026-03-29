@@ -119,7 +119,7 @@ we have for $s,t\ge 0$,
 
 $$
 \mathrm{Cov}(\widetilde W_t,\widetilde W_s)
-= \frac12\big(t^{2H}+s^{2H}-|t-s|^{2H}\big).
+= \frac12\big(t^{2H} + s^{2H}- |t-s|^{2H}\big).
 $$
 
 The stock driver is built from
