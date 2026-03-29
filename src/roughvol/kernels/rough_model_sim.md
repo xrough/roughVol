@@ -107,13 +107,13 @@ $$
 With the normalization above,
 
 $$
-\operatorname{Var}(\widetilde W_t)=t^{2H},
+\mathrm{Var}(\widetilde W_t)=t^{2H},
 $$
 
 and for \(s,t\ge 0\),
 
 $$
-\operatorname{Cov}(\widetilde W_t,\widetilde W_s)
+\mathrm{Cov}(\widetilde W_t,\widetilde W_s)
 = \frac12\big(t^{2H}+s^{2H}-|t-s|^{2H}\big).
 $$
 
@@ -611,7 +611,7 @@ At time step \(n\), compute or approximate
 $$
 m_n = \mathbb E[V_{n+1}\mid \mathcal F_{t_n}],
 \qquad
-s_n^2 = \operatorname{Var}(V_{n+1}\mid \mathcal F_{t_n}),
+s_n^2 = \mathrm{Var}(V_{n+1}\mid \mathcal F_{t_n}),
 \qquad
 \psi_n = \frac{s_n^2}{m_n^2}.
 $$
@@ -630,7 +630,7 @@ where \(a_n,b_n\) are chosen so that
 $$
 \mathbb E[V_{n+1}\mid \mathcal F_{t_n}] = m_n,
 \qquad
-\operatorname{Var}(V_{n+1}\mid \mathcal F_{t_n}) = s_n^2.
+\mathrm{Var}(V_{n+1}\mid \mathcal F_{t_n}) = s_n^2.
 $$
 
 If \(\psi_n > \psi_c\), use the atom-plus-exponential branch
