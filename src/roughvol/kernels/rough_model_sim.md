@@ -115,22 +115,22 @@ $$
 \widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-\frac{1}{2}} dW_s, 
 $$
 
-we have for $s,t\ge 0$,
+we have for example for $s,t\ge 0$,
 
 $$
-\mathrm{Cov}(\widetilde W_t,\widetilde W_s) = \frac{1}{2}\big(t^{2H} + s^{2H} - |t-s|^{2H}\big).
+\mathrm{Cov}(\widetilde W_t,\widetilde W_s) = \frac{1}{2}\big(t^{2H} + s^{2H} - |t-s|^{2H}\big),
 $$
 
-The stock driver is built from
+while the rest of the covaraince structure is also clear. The stock driver is then directly built from
 
 $$
-\Delta Z_i = \rho\,\Delta W_i + \sqrt{1-\rho^2}\,\Delta W_i^\perp.
+\Delta Z_i = \rho \Delta W_i + \sqrt{1-\rho^2} \Delta W_i^\perp.
 $$
 
 Then set
 
 $$
-V_{t_i}=\xi_0(t_i)\exp\!\left(\eta\widetilde W_{t_i}-\frac{\eta^2}{2}t_i^{2H}\right),
+V_{t_i}=\xi_0(t_i)\exp\left(\eta\widetilde W_{t_i}-\frac{\eta^2}{2}t_i^{2H}\right),
 $$
 
 and update the log stock by
