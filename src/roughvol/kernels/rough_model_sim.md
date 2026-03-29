@@ -31,8 +31,9 @@ B_t^H = \frac{1}{\Gamma(H+1/2)}
 \int_{-\infty}^0 \left((t-s)^{H-\frac{1}{2}}-(-s)^{H-\frac{1}{2}}\right) dW_s
 +
 {\color{red}\int_0^t (t-s)^{H-\frac{1}{2}} dW_s}
-\right)
+\right),
 $$
+which shows that the chosen $g$ provides the local roughness of fBM and simplify the model with the cost of losing stationary increment.
 
 ### Stock price modelling
 and stock dynamics
