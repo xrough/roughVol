@@ -28,9 +28,9 @@ Mathematical intuition is the Mandelbrot–Van Ness representation of fBM with H
 $$
 B_t^H = \frac{1}{\Gamma(H+1/2)}
 \left(
-\int_{-\infty}^0 \left((t-s)^{H-1/2}-(-s)^{H-1/2}\right) dW_s
+\int_{-\infty}^0 \left((t-s)^{H-\frac{1}{2}}-(-s)^{H-\frac{1}{2}}\right) dW_s
 +
-\int_0^t (t-s)^{H-1/2} dW_s
+\int_0^t (t-s)^{H-\frac{1}{2}} dW_s
 \right)
 $$
 
