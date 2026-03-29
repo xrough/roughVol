@@ -1,13 +1,10 @@
 # Simulation methods for rough volatility models
 
-This note organizes the main simulation methods for rough volatility models by **model class** and **numerical mechanism**. It is written to be broader than the usual short list of canonical methods. In particular, it separates
+This note organizes the main simulation methods for rough volatility models by **model class** and **numerical mechanism** with psuedo-codes. It separates
 
 1. **Gaussian rough-volatility models** such as rough Bergomi, where the main numerical task is to simulate a Gaussian Volterra field efficiently;
 2. **Affine Volterra / rough Heston-type models**, where the variance is no longer lognormal Gaussian and positivity becomes a central issue;
 3. **Accelerators and wrappers**, which are not new path generators but materially change practical performance.
-
-The emphasis is on **explicit formulas** and **implementable pseudocode**.
-
 ---
 
 ## 1. Model taxonomy
@@ -16,9 +13,9 @@ The emphasis is on **explicit formulas** and **implementable pseudocode**.
 
 These models typically take the form
 
-\[
+$$
 V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s)\,dW_s,
-\]
+$$
 
 with a singular Volterra kernel
 
