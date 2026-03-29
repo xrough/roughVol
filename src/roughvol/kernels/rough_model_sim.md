@@ -109,21 +109,13 @@ $$
 (\widetilde W_{t_1},\dots,\widetilde W_{t_n}, W_{t_1},\dots,W_{t_n}, W^\perp_{t_1},\dots,W^\perp_{t_n}) \text{ on } t_i=i\Delta t
 $$
 
-from its covariance matrix, then reconstruct $V$ and $S$.
-
-### Core formulas for rough Bergomi
+from its covariance matrix, then reconstruct $V$ and $S$. More precisely, from
 
 $$
-\widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s.
+\widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s, 
 $$
 
-With the normalization above,
-
-$$
-\mathrm{Var}(\widetilde W_t)=t^{2H},
-$$
-
-and for $s,t\ge 0$,
+we have for $s,t\ge 0$,
 
 $$
 \mathrm{Cov}(\widetilde W_t,\widetilde W_s)
