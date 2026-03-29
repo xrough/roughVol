@@ -100,19 +100,16 @@ A useful classification is by **numerical mechanism**:
 
 ---
 
-## 2. Gaussian rough-volatility models: methods and formulas
+## 2. Gaussian rough-volatility models
 
-## 2.1 Exact covariance-factorization simulation
-
-### Idea
-
-On a grid \(t_i=i\Delta t\), simulate the Gaussian vector
+## 2.1 Benchmark: Exact covariance-factorization
+Simulate the Gaussian vector
 
 $$
-(\widetilde W_{t_1},\dots,\widetilde W_{t_n}, W_{t_1},\dots,W_{t_n}, W^\perp_{t_1},\dots,W^\perp_{t_n})
+(\widetilde W_{t_1},\dots,\widetilde W_{t_n}, W_{t_1},\dots,W_{t_n}, W^\perp_{t_1},\dots,W^\perp_{t_n}) \text{on} t_i=i\Delta t
 $$
 
-from its covariance matrix, then reconstruct \(V\) and \(S\).
+from its covariance matrix, then reconstruct $V$ and $S$.
 
 ### Core formulas for rough Bergomi
 
@@ -126,7 +123,7 @@ $$
 \mathrm{Var}(\widetilde W_t)=t^{2H},
 $$
 
-and for \(s,t\ge 0\),
+and for $s,t\ge 0$,
 
 $$
 \mathrm{Cov}(\widetilde W_t,\widetilde W_s)
