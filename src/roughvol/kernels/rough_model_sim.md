@@ -171,8 +171,7 @@ Input: grid t_0,...,t_n, H, eta, rho, forward variance xi0(.), S0
 ### Remarks
 
 - This is the clean benchmark method for rough Bergomi.
-- It is accurate but expensive if implemented naively, especially when the covariance matrix is factorized directly.
-- It is most useful as a gold standard, for small grids, or for validating faster approximations.
+- It is accurate but **expensive** if implemented naively, especially when the covariance matrix is factorized directly.
 
 ---
 
