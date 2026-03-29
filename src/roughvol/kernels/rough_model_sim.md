@@ -235,7 +235,7 @@ $$
 X(t)=\int_0^t g(t-s)\sigma(s) dW_s,
 $$
 
-with singular kernel $ g(x)\sim x^\alpha L_g(x), $\alpha\in(-1/2,1/2)\setminus\{0\}$, approximate the kernel by
+with singular kernel $g(x) \sim x^\alpha L_g(x)$, for nonzero $\alpha$ in $(-\frac{1}{2},\frac{1}{2})$, approximate the kernel by
 
 - a **power function near the singularity**, and
 - a **step function away from the singularity**.
