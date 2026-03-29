@@ -26,15 +26,15 @@ $$
 and stock dynamics
 
 $$
-\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} dW_t^\perp.
+\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} gitdW_t^\perp.
 $$
 
 The canonical example is **rough Bergomi**:
 
 $$
-V_t = \xi_0(t)\exp\!\left(\eta\widetilde W_t - \frac{\eta^2}{2}t^{2H}\right),
+V_t = \xi_0(t)\exp\left(\eta\widetilde W_t - \frac{\eta^2}{2}t^{2H}\right),
 \qquad
-\widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s.
+\widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-\frac{1}{2}}dW_s.
 $$
 
 ### 1.2 Affine Volterra / rough Heston-type models
