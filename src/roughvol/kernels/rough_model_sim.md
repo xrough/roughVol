@@ -20,7 +20,20 @@ $$
 To capture **roughness**, canonical choice of the kernel is usually Volterra 
 
 $$
-g(u) \sim u^{H-\frac{1}{2}}, \qquad H\in(0,\frac{1}{2}),
+g(u) \sim u^{H-\frac{1}{2}}, \qquad H\in(0,\frac{1}{2}).
+$$
+
+Mathematical intuition is the Mandelbrot–Van Ness formula:
+
+$$
+B_t^H
+=
+\frac{1}{\Gamma(H+1/2)}
+\left(
+\int_{-\infty}^0 \left((t-s)^{H-1/2}-(-s)^{H-1/2}\right)\,dW_s
++
+\int_0^t (t-s)^{H-1/2}\,dW_s
+\right)
 $$
 
 ### Stock price modelling
