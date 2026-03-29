@@ -42,15 +42,15 @@ $$
 These models are usually written as stochastic Volterra equations. The rough Heston model is
 
 $$
-\frac{dS_t}{S_t} = \sqrt{V_t}\,dW_t^{(1)},
+\frac{dS_t}{S_t} = \sqrt{V_t} dW_t^{(1)},
 \qquad
-V_t = V_0 + \int_0^t K(t-s)\Big(\lambda(\theta - V_s)\,ds + \nu\sqrt{V_s}\,dW_s^{(2)}\Big),
+V_t = V_0 + \int_0^t K(t-s)\Big(\lambda(\theta - V_s)\,ds + \nu\sqrt{V_s} dW_s^{(2)}\Big),
 $$
 
 with
 
 $$
-K(t)=\frac{t^{H-1/2}}{\Gamma(H+1/2)}, \qquad H\in(0,1/2),
+K(t)=\frac{t^{H-\frac{1}{2}}}{\Gamma(H+\frac{1}{2})}, \qquad H\in(0,\frac{1}{2}),
 $$
 
 and
