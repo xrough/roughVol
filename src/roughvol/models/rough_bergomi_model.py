@@ -5,26 +5,37 @@ from dataclasses import dataclass
 import numpy as np
 
 from roughvol.kernels import rough_bergomi_midpoint_weights
+from roughvol.kernels.rough_bergomi_blp import rough_bergomi_blp_driver
+from roughvol.kernels.rough_bergomi_exact import rough_bergomi_exact_cholesky
 from roughvol.sim.brownian import correlated_brownian_increments
 from roughvol.types import MarketData, PathBundle, SimConfig
+
+_VALID_SCHEMES = ("volterra-midpoint", "exact-gaussian", "blp-hybrid")
 
 
 @dataclass(frozen=True)
 class RoughBergomiModel:
-    """Approximate rough Bergomi model with midpoint Volterra discretisation.
+    """Rough Bergomi model with selectable simulation scheme.
 
     Parameters
     ----------
-    hurst : roughness parameter H in (0, 0.5)
-    eta   : volatility-of-volatility
-    rho   : correlation between the variance driver and spot driver
-    xi0   : flat initial forward variance level, used when market.forward_variance_curve is absent
+    hurst  : roughness parameter H in (0, 0.5)
+    eta    : volatility-of-volatility
+    rho    : correlation between the variance driver and spot driver
+    xi0    : flat initial forward variance level, used when market.forward_variance_curve is absent
+    scheme : simulation scheme; one of:
+        - ``"volterra-midpoint"``  (default) — O(n²) midpoint Volterra quadrature (§2.5)
+        - ``"exact-gaussian"``    — O(n³) precomp Cholesky of joint fBM covariance (§2.1 benchmark)
+        - ``"blp-hybrid"``        — O(n log n) Bennedsen-Lunde-Pakkanen hybrid scheme (§2.3)
+    blp_kappa : near-field cutoff for the BLP scheme (default 10)
     """
 
     hurst: float
     eta: float
     rho: float
     xi0: float
+    scheme: str = "volterra-midpoint"
+    blp_kappa: int = 10
 
     def simulate_paths(
         self,
@@ -33,6 +44,10 @@ class RoughBergomiModel:
         sim: SimConfig,
         rng: np.random.Generator,
     ) -> PathBundle:
+        scheme = str(self.scheme)
+        if scheme not in _VALID_SCHEMES:
+            raise ValueError(f"Unknown scheme {scheme!r}. Valid: {_VALID_SCHEMES}")
+
         H = float(self.hurst)
         eta = float(self.eta)
         rho = float(self.rho)
@@ -76,7 +91,7 @@ class RoughBergomiModel:
                     "var": np.broadcast_to(xi_curve, (n_paths, 1)).copy(),
                     "Y": np.zeros((n_paths, 1), dtype=float),
                 },
-                metadata={"model": "RoughBergomi", "scheme": "volterra-midpoint"},
+                metadata={"model": "RoughBergomi", "scheme": scheme},
             )
 
         dt = np.diff(t)
@@ -84,13 +99,42 @@ class RoughBergomiModel:
             raise ValueError("Time grid must be strictly increasing.")
 
         n_steps = n_times - 1
+        xi_curve = _forward_variance_curve(t, market, xi0)
+
+        # ------------------------------------------------------------------
+        # Dispatch to selected scheme
+        # ------------------------------------------------------------------
+        if scheme == "volterra-midpoint":
+            return self._simulate_volterra_midpoint(
+                t=t, dt=dt, n_steps=n_steps, n_paths=n_paths,
+                antithetic=antithetic, H=H, eta=eta, rho=rho, xi0=xi0,
+                S0=S0, r=r, q=q, xi_curve=xi_curve, rng=rng,
+            )
+        elif scheme == "exact-gaussian":
+            return self._simulate_exact_gaussian(
+                t=t, dt=dt, n_steps=n_steps, n_paths=n_paths,
+                antithetic=antithetic, H=H, eta=eta, rho=rho, xi0=xi0,
+                S0=S0, r=r, q=q, xi_curve=xi_curve, rng=rng,
+            )
+        else:  # blp-hybrid
+            return self._simulate_blp_hybrid(
+                t=t, dt=dt, n_steps=n_steps, n_paths=n_paths,
+                antithetic=antithetic, H=H, eta=eta, rho=rho, xi0=xi0,
+                S0=S0, r=r, q=q, xi_curve=xi_curve, rng=rng,
+            )
+
+    # ------------------------------------------------------------------
+    # Private scheme implementations
+    # ------------------------------------------------------------------
+
+    def _simulate_volterra_midpoint(
+        self, *, t, dt, n_steps, n_paths, antithetic, H, eta, rho, xi0,
+        S0, r, q, xi_curve, rng,
+    ) -> PathBundle:
+        n_times = n_steps + 1
         dW_y, dW_s = correlated_brownian_increments(
-            n_paths=n_paths,
-            n_steps=n_steps,
-            dt=1.0,
-            rho=rho,
-            rng=rng,
-            antithetic=antithetic,
+            n_paths=n_paths, n_steps=n_steps, dt=1.0,
+            rho=rho, rng=rng, antithetic=antithetic,
         )
         dW_y *= np.sqrt(dt)[None, :]
         dW_s *= np.sqrt(dt)[None, :]
@@ -99,21 +143,7 @@ class RoughBergomiModel:
         Y = np.zeros((n_paths, n_times), dtype=float)
         Y[:, 1:] = dW_y @ weights.T
 
-        xi_curve = _forward_variance_curve(t, market, xi0)
-        var = np.empty((n_paths, n_times), dtype=float)
-        var[:, 0] = xi_curve[0]
-        variance_correction = np.power(t[1:], 2.0 * H)
-        var[:, 1:] = xi_curve[1:][None, :] * np.exp(
-            eta * Y[:, 1:] - 0.5 * (eta ** 2) * variance_correction[None, :]
-        )
-
-        S = np.empty((n_paths, n_times), dtype=float)
-        S[:, 0] = S0
-        for j in range(n_steps):
-            v = np.maximum(var[:, j], 0.0)
-            drift = (r - q - 0.5 * v) * dt[j]
-            diffusion = np.sqrt(v) * dW_s[:, j]
-            S[:, j + 1] = S[:, j] * np.exp(drift + diffusion)
+        var, S = _var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q, n_steps, n_paths)
 
         return PathBundle(
             t=t,
@@ -124,15 +154,143 @@ class RoughBergomiModel:
                 "forward_variance_curve": np.broadcast_to(xi_curve, (n_paths, n_times)),
             },
             metadata={
-                "model": "RoughBergomi",
-                "scheme": "volterra-midpoint",
-                "hurst": H,
-                "eta": eta,
-                "rho": rho,
-                "xi0": xi0,
-                "antithetic": antithetic,
+                "model": "RoughBergomi", "scheme": "volterra-midpoint",
+                "hurst": H, "eta": eta, "rho": rho, "xi0": xi0, "antithetic": antithetic,
             },
         )
+
+    def _simulate_exact_gaussian(
+        self, *, t, dt, n_steps, n_paths, antithetic, H, eta, rho, xi0,
+        S0, r, q, xi_curve, rng,
+    ) -> PathBundle:
+        """Exact Gaussian simulation via Cholesky of joint (Wtilde, W) covariance (§2.1)."""
+        n_times = n_steps + 1
+
+        # Build Cholesky factor once (O(n^3) precomputation)
+        L = rough_bergomi_exact_cholesky(t, H)  # (2n, 2n)
+        n = n_steps  # number of non-zero time points
+
+        # Sample raw Gaussians and apply Cholesky
+        def _sample_block(rng_local):
+            Z = rng_local.standard_normal((2 * n, n_paths))  # (2n, n_paths)
+            X = L @ Z  # (2n, n_paths)
+            Wtilde = X[:n, :].T  # (n_paths, n)
+            W = X[n:, :].T      # (n_paths, n)
+            return Wtilde, W
+
+        if antithetic:
+            half = n_paths // 2
+            Z_half = rng.standard_normal((2 * n, half))
+            X_half = L @ Z_half
+            Wtilde_pos = X_half[:n, :].T
+            W_pos = X_half[n:, :].T
+            # Antithetic: negate the Gaussians (Wtilde and W are both linear in Z)
+            Wtilde_neg = -Wtilde_pos
+            W_neg = -W_pos
+            Wtilde = np.concatenate([Wtilde_pos, Wtilde_neg], axis=0)  # (n_paths, n)
+            W = np.concatenate([W_pos, W_neg], axis=0)
+        else:
+            Z = rng.standard_normal((2 * n, n_paths))
+            X = L @ Z
+            Wtilde = X[:n, :].T  # (n_paths, n)
+            W = X[n:, :].T       # (n_paths, n)
+
+        # BM increments from the simulated level paths
+        dW_y = np.diff(np.concatenate([np.zeros((n_paths, 1)), W], axis=1), axis=1)  # (n_paths, n)
+
+        # Orthogonal BM increments for spot correlation
+        dWperp = rng.standard_normal((n_paths, n_steps)) * np.sqrt(dt)[None, :]
+        dW_s = rho * dW_y + np.sqrt(1.0 - rho ** 2) * dWperp
+
+        # Build full Ytilde = (0, Wtilde_t1, ..., Wtilde_tn)
+        Y = np.zeros((n_paths, n_times), dtype=float)
+        Y[:, 1:] = Wtilde
+
+        var, S = _var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q, n_steps, n_paths)
+
+        return PathBundle(
+            t=t,
+            state={"spot": S, "var": var, "Y": Y},
+            extras={
+                "dW_y": dW_y,
+                "dW_s": dW_s,
+                "forward_variance_curve": np.broadcast_to(xi_curve, (n_paths, n_times)),
+            },
+            metadata={
+                "model": "RoughBergomi", "scheme": "exact-gaussian",
+                "hurst": H, "eta": eta, "rho": rho, "xi0": xi0, "antithetic": antithetic,
+            },
+        )
+
+    def _simulate_blp_hybrid(
+        self, *, t, dt, n_steps, n_paths, antithetic, H, eta, rho, xi0,
+        S0, r, q, xi_curve, rng,
+    ) -> PathBundle:
+        """BLP hybrid scheme (§2.3): near-field exact + far-field FFT convolution."""
+        n_times = n_steps + 1
+        kappa = int(self.blp_kappa)
+
+        # Generate correlated raw BM increments (variance driver dW_y, spot driver dW_s)
+        dW_y, dW_s = correlated_brownian_increments(
+            n_paths=n_paths, n_steps=n_steps, dt=1.0,
+            rho=rho, rng=rng, antithetic=antithetic,
+        )
+        dW_y *= np.sqrt(dt)[None, :]
+        dW_s *= np.sqrt(dt)[None, :]
+
+        # BLP driver returns Y of shape (n_paths, n_times)
+        Y = rough_bergomi_blp_driver(dW_y, t, H, kappa=kappa, rng=rng)
+
+        var, S = _var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q, n_steps, n_paths)
+
+        return PathBundle(
+            t=t,
+            state={"spot": S, "var": var, "Y": Y},
+            extras={
+                "dW_y": dW_y,
+                "dW_s": dW_s,
+                "forward_variance_curve": np.broadcast_to(xi_curve, (n_paths, n_times)),
+            },
+            metadata={
+                "model": "RoughBergomi", "scheme": "blp-hybrid",
+                "hurst": H, "eta": eta, "rho": rho, "xi0": xi0,
+                "antithetic": antithetic, "blp_kappa": kappa,
+            },
+        )
+
+
+def _var_and_spot(
+    Y: np.ndarray,
+    xi_curve: np.ndarray,
+    t: np.ndarray,
+    dt: np.ndarray,
+    dW_s: np.ndarray,
+    H: float,
+    eta: float,
+    S0: float,
+    r: float,
+    q: float,
+    n_steps: int,
+    n_paths: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute variance and spot paths given the Volterra driver Y."""
+    n_times = n_steps + 1
+    var = np.empty((n_paths, n_times), dtype=float)
+    var[:, 0] = xi_curve[0]
+    variance_correction = np.power(t[1:], 2.0 * H)
+    var[:, 1:] = xi_curve[1:][None, :] * np.exp(
+        eta * Y[:, 1:] - 0.5 * (eta ** 2) * variance_correction[None, :]
+    )
+
+    S = np.empty((n_paths, n_times), dtype=float)
+    S[:, 0] = S0
+    for j in range(n_steps):
+        v = np.maximum(var[:, j], 0.0)
+        drift = (r - q - 0.5 * v) * dt[j]
+        diffusion = np.sqrt(v) * dW_s[:, j]
+        S[:, j + 1] = S[:, j] * np.exp(drift + diffusion)
+
+    return var, S
 
 
 def _forward_variance_curve(t: np.ndarray, market: MarketData, xi0: float) -> np.ndarray:

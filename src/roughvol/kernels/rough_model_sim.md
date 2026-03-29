@@ -130,13 +130,13 @@ $$
 Then set
 
 $$
-V_{t_i}=\xi_0(t_i)\exp\left(\eta\widetilde W_{t_i}-\frac{\eta^2}{2}t_i^{2H}\right),
+V_{t_i}=\xi_0(t_i)\exp \left(\eta\widetilde W_{t_i}-\frac{\eta^2}{2}t_i^{2H}\right),
 $$
 
 and update the log stock by
 
 $$
-\log S_{t_{i+1}} = \log S_{t_i} - \frac12 V_{t_i}\Delta t + \sqrt{V_{t_i}}\,\Delta Z_i.
+\log S_{t_{i+1}} = \log S_{t_i} - \frac12 V_{t_i}\Delta t + \sqrt{V_{t_i}} \Delta Z_i.
 $$
 
 ### Pseudocode
