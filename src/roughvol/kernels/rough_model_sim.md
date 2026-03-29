@@ -244,7 +244,7 @@ This is the standard fast simulation method for rough Bergomi-type Gaussian driv
 
 ### Discrete formula
 
-On a grid \(t_i=i/n\), the hybrid approximation has the form
+On a grid $(t_i=\frac{i}{n})$, the hybrid approximation has the form
 
 $$
 X_n(t_i)
