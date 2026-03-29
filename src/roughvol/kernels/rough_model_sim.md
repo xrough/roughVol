@@ -11,7 +11,7 @@ This note organizes the main simulation methods for rough volatility models by *
 
 ### 1.1 Gaussian rough-volatility models
 
-These models typically take the form
+These volatility models typically take the form
 
 $$
 V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s)dW_s,
@@ -20,7 +20,7 @@ $$
 with a singular Volterra kernel
 
 $$
-g(u) \sim c\,u^{H-1/2}, \qquad H\in(0,1/2),
+g(u) \sim u^{H-1/2}, \qquad H\in(0,\frac{1}{2}),
 $$
 
 and stock dynamics
