@@ -20,13 +20,13 @@ $$
 with a singular Volterra kernel
 
 $$
-g(u) \sim u^{H-1/2}, \qquad H\in(0,\frac{1}{2}),
+g(u) \sim u^{H-\frac{1}{2}}, \qquad H\in(0,\frac{1}{2}),
 $$
 
 and stock dynamics
 
 $$
-\frac{dS_t}{S_t} = \sqrt{V_t}\,dZ_t, \qquad dZ_t = \rho\,dW_t + \sqrt{1-\rho^2}\,dW_t^\perp.
+\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} dW_t^\perp.
 $$
 
 The canonical example is **rough Bergomi**:
