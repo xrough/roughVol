@@ -14,62 +14,62 @@ This note organizes the main simulation methods for rough volatility models by *
 These models typically take the form
 
 $$
-V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s)\,dW_s,
+V_t = \Phi(X_t), \qquad X_t = \int_0^t g(t-s)dW_s,
 $$
 
 with a singular Volterra kernel
 
-\[
+$$
 g(u) \sim c\,u^{H-1/2}, \qquad H\in(0,1/2),
-\]
+$$
 
 and stock dynamics
 
-\[
+$$
 \frac{dS_t}{S_t} = \sqrt{V_t}\,dZ_t, \qquad dZ_t = \rho\,dW_t + \sqrt{1-\rho^2}\,dW_t^\perp.
-\]
+$$
 
 The canonical example is **rough Bergomi**:
 
-\[
+$$
 V_t = \xi_0(t)\exp\!\left(\eta\widetilde W_t - \frac{\eta^2}{2}t^{2H}\right),
 \qquad
 \widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s.
-\]
+$$
 
 ### 1.2 Affine Volterra / rough Heston-type models
 
 These models are usually written as stochastic Volterra equations. The rough Heston model is
 
-\[
+$$
 \frac{dS_t}{S_t} = \sqrt{V_t}\,dW_t^{(1)},
 \qquad
 V_t = V_0 + \int_0^t K(t-s)\Big(\lambda(\theta - V_s)\,ds + \nu\sqrt{V_s}\,dW_s^{(2)}\Big),
-\]
+$$
 
 with
 
-\[
+$$
 K(t)=\frac{t^{H-1/2}}{\Gamma(H+1/2)}, \qquad H\in(0,1/2),
-\]
+$$
 
 and
 
-\[
+$$
 d\langle W^{(1)},W^{(2)}\rangle_t = \rho\,dt.
-\]
+$$
 
 An equivalent integrated-variance formulation uses
 
-\[
+$$
 X_t := \int_0^t V_s\,ds,
-\]
+$$
 
 and rewrites the dynamics in terms of \(X\) and the martingales
 
-\[
+$$
 M_t^{(i)} := \int_0^t \sqrt{V_s}\,dW_s^{(i)}.
-\]
+$$
 
 ### 1.3 What counts as a distinct simulation method?
 
@@ -92,48 +92,48 @@ A useful classification is by **numerical mechanism**:
 
 On a grid \(t_i=i\Delta t\), simulate the Gaussian vector
 
-\[
+$$
 (\widetilde W_{t_1},\dots,\widetilde W_{t_n}, W_{t_1},\dots,W_{t_n}, W^\perp_{t_1},\dots,W^\perp_{t_n})
-\]
+$$
 
 from its covariance matrix, then reconstruct \(V\) and \(S\).
 
 ### Core formulas for rough Bergomi
 
-\[
+$$
 \widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s.
-\]
+$$
 
 With the normalization above,
 
-\[
+$$
 \operatorname{Var}(\widetilde W_t)=t^{2H},
-\]
+$$
 
 and for \(s,t\ge 0\),
 
-\[
+$$
 \operatorname{Cov}(\widetilde W_t,\widetilde W_s)
 = \frac12\big(t^{2H}+s^{2H}-|t-s|^{2H}\big).
-\]
+$$
 
 The stock driver is built from
 
-\[
+$$
 \Delta Z_i = \rho\,\Delta W_i + \sqrt{1-\rho^2}\,\Delta W_i^\perp.
-\]
+$$
 
 Then set
 
-\[
+$$
 V_{t_i}=\xi_0(t_i)\exp\!\left(\eta\widetilde W_{t_i}-\frac{\eta^2}{2}t_i^{2H}\right),
-\]
+$$
 
 and update the log stock by
 
-\[
+$$
 \log S_{t_{i+1}} = \log S_{t_i} - \frac12 V_{t_i}\Delta t + \sqrt{V_{t_i}}\,\Delta Z_i.
-\]
+$$
 
 ### Pseudocode
 
@@ -175,15 +175,15 @@ This is not a separate rough-vol model, but a separate **Gaussian engine**. It i
 
 For fBm \(B^H\), the increments
 
-\[
+$$
 Y_k = B^H_{k+1} - B^H_k
-\]
+$$
 
 are stationary with covariance
 
-\[
+$$
 \gamma(m) = \frac12\Big((m+1)^{2H} - 2m^{2H} + (m-1)^{2H}\Big), \qquad m\ge 1,
-\]
+$$
 
 and \(\gamma(0)=1\).
 
@@ -215,9 +215,9 @@ Input: H, number of increments n
 
 For a truncated Brownian semistationary / Volterra process
 
-\[
+$$
 X(t)=\int_0^t g(t-s)\sigma(s)\,dW_s,
-\]
+$$
 
 with singular kernel \(g(x)\sim x^\alpha L_g(x)\), \(\alpha\in(-1/2,1/2)\setminus\{0\}\), approximate the kernel by
 
@@ -230,35 +230,35 @@ This is the standard fast simulation method for rough Bergomi-type Gaussian driv
 
 On a grid \(t_i=i/n\), the hybrid approximation has the form
 
-\[
+$$
 X_n(t_i)
 =
 \sum_{k=1}^{\kappa} L_g(k/n)\,\sigma_{i-k}^n\,W_{i-k,k}^n
 +
 \sum_{k=\kappa+1}^{N_n} g(b_k^*/n)\,\sigma_{i-k}^n\,W_{i-k}^n,
-\]
+$$
 
 where
 
-\[
+$$
 W_{i-k,k}^n := \int_{t_{i-k}}^{t_{i-k+1}} (t_i-s)^\alpha \, dW_s,
 \qquad
 W_{i-k}^n := W_{t_{i-k+1}}-W_{t_{i-k}}.
-\]
+$$
 
 The first sum handles the kernel singularity accurately; the second sum is a discrete convolution and can be evaluated by FFT.
 
 For rough Bergomi, one applies this to
 
-\[
+$$
 \widetilde W_t = \sqrt{2H}\int_0^t (t-s)^{H-1/2}dW_s,
-\]
+$$
 
 then sets
 
-\[
+$$
 V_{t_i} = \xi_0(t_i)\exp\!\left(\eta\widetilde W_{t_i} - \frac{\eta^2}{2}t_i^{2H}\right).
-\]
+$$
 
 ### Pseudocode
 
@@ -300,31 +300,31 @@ Replace Brownian motion by a scaled random walk, then push it through the fracti
 
 On a grid \(t_i=i\Delta t\), let \((\xi_i)\) be i.i.d. centered, variance-one random variables. Define
 
-\[
+$$
 W_n(t_i)=\sqrt{\Delta t}\sum_{k=1}^i \xi_k.
-\]
+$$
 
 For a Volterra operator \(\mathcal G^\alpha\), write the discrete convolution
 
-\[
+$$
 (\mathcal G^\alpha W_n)(t_i)
 \approx
 \sqrt{\Delta t}\sum_{k=1}^i g(t_{i-k+1})\,\xi_k.
-\]
+$$
 
 A generic rough-vol approximation then takes the form
 
-\[
+$$
 X_{i+1}=X_i - \frac12\Phi(Y_i)\Delta t + \sqrt{\Phi(Y_i)}\,\Delta B_i,
 \qquad
 Y_i=(\mathcal G^\alpha W_n)(t_i).
-\]
+$$
 
 For rough Bergomi,
 
-\[
+$$
 V_i = \xi_0(t_i)\exp\!\left(\eta Y_i - \frac{\eta^2}{2}t_i^{2H}\right).
-\]
+$$
 
 ### Pseudocode
 
@@ -360,15 +360,15 @@ If the innovations are Bernoulli \(\pm1\), the same construction yields a recomb
 
 The most literal discretization of
 
-\[
+$$
 X_t = \int_0^t g(t-s)\,dW_s
-\]
+$$
 
 is the left-point or midpoint quadrature
 
-\[
+$$
 X_{t_i} \approx \sum_{j=0}^{i-1} g(t_i-t_j)\,\Delta W_j.
-\]
+$$
 
 For rough kernels \(g(u)\sim u^{H-1/2}\), this is the simplest route but performs poorly near the singularity unless the grid is fine or special corrections are added.
 
@@ -419,9 +419,9 @@ Input: any path generator producing payoff X
 
 Given a deterministic transform
 
-\[
+$$
 G \mapsto \text{path}(G) \mapsto \text{payoff}(G),
-\]
+$$
 
 replace pseudorandom Gaussians by low-discrepancy points mapped to Gaussian space. This is especially effective after dimension reduction (PCA / bridge construction).
 
@@ -429,9 +429,9 @@ replace pseudorandom Gaussians by low-discrepancy points mapped to Gaussian spac
 
 Given a hierarchy of grid sizes \(\Delta t_\ell\), use
 
-\[
+$$
 \mathbb E[P_L] = \mathbb E[P_0] + \sum_{\ell=1}^L \mathbb E[P_\ell - P_{\ell-1}],
-\]
+$$
 
 and estimate each term with a coupled coarse/fine simulation.
 
@@ -452,17 +452,17 @@ Discretize the rough Heston variance equation directly in time.
 
 ### Model
 
-\[
+$$
 V_t = V_0 + \int_0^t K(t-s)\Big(\lambda(\theta-V_s)\,ds + \nu\sqrt{V_s}\,dW_s\Big),
 \qquad
 K(t)=\frac{t^{H-1/2}}{\Gamma(H+1/2)}.
-\]
+$$
 
 ### Explicit time-stepping formula
 
 On a grid \(t_i=i\Delta t\), a left-point Euler-type discretization is
 
-\[
+$$
 V_{i+1}
 =
 V_0
@@ -470,13 +470,13 @@ V_0
 \sum_{j=0}^{i} K(t_{i+1}-t_j)\lambda(\theta - V_j)\Delta t
 +
 \sum_{j=0}^{i} K(t_{i+1}-t_j)\nu\sqrt{(V_j)_+}\,\Delta W_j.
-\]
+$$
 
 The stock is then updated by
 
-\[
+$$
 \log S_{i+1} = \log S_i - \frac12 V_i\Delta t + \sqrt{V_i}\,\Delta W_i^{(1)}.
-\]
+$$
 
 ### Pseudocode
 
@@ -511,9 +511,9 @@ Input: grid, kernel K, parameters lambda, theta, nu, rho, V0, S0
 
 Work with
 
-\[
+$$
 X_t=\int_0^t V_s ds,
-\]
+$$
 
 rather than directly with \(V\), because some path functionals and convergence arguments are cleaner in this representation.
 
@@ -521,17 +521,17 @@ rather than directly with \(V\), because some path functionals and convergence a
 
 The integrated rough Heston system can be written in the form
 
-\[
+$$
 X_t = V_0 t + \int_0^t K(t-s)\big(\theta s - \lambda X_s + \nu M_s\big)ds,
-\]
+$$
 
 where \(M_t = \int_0^t \sqrt{V_u}\,dW_u\) and \(d\langle M\rangle_t = V_t dt\).
 
 A discrete approximation evolves \(X_i\), then recovers
 
-\[
+$$
 V_i \approx \frac{X_i - X_{i-1}}{\Delta t}
-\]
+$$
 
 or a similar finite-difference estimate.
 
@@ -571,11 +571,11 @@ In practice this means storing the past path and repeatedly recomputing convolut
 
 If the model is represented by a forward variance curve \(\xi_t(u)\), then on a grid one approximates
 
-\[
+$$
 \int_0^{t_i} K(t_i-s) f(V_s)\,ds
 \approx
 \sum_{j=0}^{i-1} K(t_i-t_j) f(V_j)\Delta t.
-\]
+$$
 
 ### Pseudocode
 
@@ -608,43 +608,43 @@ This is an important practical scheme associated with Gatheral’s AFV simulatio
 
 At time step \(n\), compute or approximate
 
-\[
+$$
 m_n = \mathbb E[V_{n+1}\mid \mathcal F_{t_n}],
 \qquad
 s_n^2 = \operatorname{Var}(V_{n+1}\mid \mathcal F_{t_n}),
 \qquad
 \psi_n = \frac{s_n^2}{m_n^2}.
-\]
+$$
 
 ### QE branch formulas
 
 If \(\psi_n \le \psi_c\), use the quadratic-Gaussian branch
 
-\[
+$$
 V_{n+1} = a_n (b_n + Z)^2,
 \qquad Z\sim N(0,1),
-\]
+$$
 
 where \(a_n,b_n\) are chosen so that
 
-\[
+$$
 \mathbb E[V_{n+1}\mid \mathcal F_{t_n}] = m_n,
 \qquad
 \operatorname{Var}(V_{n+1}\mid \mathcal F_{t_n}) = s_n^2.
-\]
+$$
 
 If \(\psi_n > \psi_c\), use the atom-plus-exponential branch
 
-\[
+$$
 V_{n+1} = 0 \quad \text{with probability } p_n,
-\]
+$$
 
 and otherwise
 
-\[
+$$
 V_{n+1} = \frac{1}{\beta_n}\log\!\left(\frac{1-p_n}{1-U}\right),
 \qquad U\sim \mathrm{Unif}(0,1),
-\]
+$$
 
 with \(p_n,\beta_n\) chosen to match \(m_n\) and \(s_n^2\).
 
@@ -685,9 +685,9 @@ Input: grid, rough-Heston / AFV parameters
 
 Approximate the rough kernel by a sum of exponentials:
 
-\[
+$$
 K(t) \approx K_N(t) = \sum_{m=1}^N w_m e^{-x_m t}.
-\]
+$$
 
 This lifts the non-Markovian model to an \(N\)-factor Markov diffusion.
 
@@ -695,27 +695,27 @@ This lifts the non-Markovian model to an \(N\)-factor Markov diffusion.
 
 Define factor processes
 
-\[
+$$
 Y_t^{(m)} = \int_0^t e^{-x_m(t-s)}\Big(\lambda(\theta-V_s)\,ds + \nu\sqrt{V_s}\,dW_s\Big),
-\]
+$$
 
 and set
 
-\[
+$$
 V_t \approx V_0 + \sum_{m=1}^N w_m Y_t^{(m)}.
-\]
+$$
 
 Then
 
-\[
+$$
 dY_t^{(m)} = \big(-x_m Y_t^{(m)} + \lambda(\theta-V_t)\big)dt + \nu\sqrt{V_t}\,dW_t.
-\]
+$$
 
 The stock equation becomes a standard Markovian stochastic volatility system:
 
-\[
+$$
 \frac{dS_t}{S_t}=\sqrt{V_t}\,dW_t^{(1)}.
-\]
+$$
 
 ### Pseudocode
 
@@ -752,10 +752,10 @@ Start from the multi-factor Markovian lift and then use a **weak simulation sche
 
 Given the Markovian state at time \(t_n\), compute conditional moments of the one-step variance proxy and replace the true increment by a discrete random variable \(\zeta_n\) supported on a few nonnegative points, chosen so that
 
-\[
+$$
 \mathbb E[\zeta_n^k\mid \mathcal F_{t_n}] = \text{target moment } k,
 \qquad k=1,\dots,r.
-\]
+$$
 
 Then update the factors using \(\zeta_n\) instead of a Gaussian/Euler increment.
 
@@ -794,17 +794,17 @@ Instead of simulating the spot variance directly, simulate the **integrated Volt
 
 Let
 
-\[
+$$
 X_t = \int_0^t V_s ds.
-\]
+$$
 
 The iVi philosophy is to update \(X\) using only integrated-kernel quantities, then recover the variance increment from the increment of \(X\). The scheme is implicit in integrated form and preserves monotonicity of \(X\).
 
 A rough finite-difference recovery is
 
-\[
+$$
 V_{i+1} \approx \frac{X_{i+1}-X_i}{\Delta t}.
-\]
+$$
 
 ### Pseudocode
 
@@ -838,19 +838,19 @@ Once a rough model has been lifted to a finite-dimensional Markov system, one ma
 
 For example, if the lifted generator decomposes as
 
-\[
+$$
 \mathcal L = \mathcal L_0 + \mathcal L_1,
-\]
+$$
 
 one may use Lie–Trotter or Strang splitting:
 
-\[
+$$
 e^{\Delta t \mathcal L}
 \approx
  e^{\frac{\Delta t}{2}\mathcal L_0}
  e^{\Delta t\mathcal L_1}
  e^{\frac{\Delta t}{2}\mathcal L_0}.
-\]
+$$
 
 ### Pseudocode
 
