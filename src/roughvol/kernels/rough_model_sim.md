@@ -37,11 +37,13 @@ $$
 which shows that the chosen $g$ provides the local roughness of fBM and simplify the model with the cost of losing stationary increment.
 
 ### Stock price modelling
-and stock dynamics
+Stock dynamics are modelled by 
 
 $$
-\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} dW_t^\perp.
+\frac{dS_t}{S_t} = \sqrt{V_t} dZ_t, \qquad dZ_t = \rho dW_t + \sqrt{1-\rho^2} dW_t^\perp,
 $$
+
+where the essential point is the correlation of $S$ and $V$ by design.
 
 ### Canonical Models
 
