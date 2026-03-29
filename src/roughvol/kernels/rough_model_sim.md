@@ -106,7 +106,7 @@ A useful classification is by **numerical mechanism**:
 Simulate the Gaussian vector
 
 $$
-(\widetilde W_{t_1},\dots,\widetilde W_{t_n}, W_{t_1},\dots,W_{t_n}, W^\perp_{t_1},\dots,W^\perp_{t_n}) \text{on} t_i=i\Delta t
+(\widetilde W_{t_1},\dots,\widetilde W_{t_n}, W_{t_1},\dots,W_{t_n}, W^\perp_{t_1},\dots,W^\perp_{t_n}) \text{ on } t_i=i\Delta t
 $$
 
 from its covariance matrix, then reconstruct $V$ and $S$.
