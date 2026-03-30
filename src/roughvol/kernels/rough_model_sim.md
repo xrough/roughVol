@@ -423,7 +423,7 @@ Input: grid, kernel g, Brownian increments dW_j
 
 ---
 
-## 2.6 \color{red}{Variance-reduction} and quadrature wrappers for Gaussian rough-vol models
+## 2.6 Variance-reduction and quadrature wrappers for Gaussian rough-vol models
 
 These methods do **not** change the path generator but are important enough to list separately.
 
