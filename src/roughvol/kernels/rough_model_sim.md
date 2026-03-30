@@ -191,22 +191,30 @@ C_{ij} = c_{(j-i)\bmod m}.
 $$
 
 With this symmetric construction, the top-left $n \times n$ block of $C$ matches the original Toeplitz covariance:
+
 $$
 C_{ij} = r(|i-j|), \qquad 0 \le i,j \le n-1.
 $$
+
 So the original covariance matrix appears as a submatrix of a larger circulant one. On the other hand, **Fourier modes are eigenvectors**: For each frequency $j=0,\dots,m-1$, define the vector
+
 $$
 v^{(j)} = \big(1,\omega^j,\omega^{2j},\dots,\omega^{(m-1)j}\big)^\top,
 \qquad \omega = e^{-2\pi i/m}.
 $$
+
 These are the discrete Fourier basis vectors. Because $C$ acts by cyclic convolution, applying $C$ to $v^{(j)}$ gives
+
 $$
 Cv^{(j)} = \lambda_j v^{(j)},
 $$
+
 where
+
 $$
 \lambda_j = \sum_{k=0}^{m-1} c_k \omega^{jk}.
 $$
+
 So each Fourier mode forms an eigenvector, and the corresponding eigenvalue is exactly the DFT of the first row. So Davies–Harte works by:
 
 1. embedding the target Toeplitz covariance into a larger **circulant** covariance,
