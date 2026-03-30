@@ -4,17 +4,37 @@ A Python library for derivative pricing and calibration under stochastic and rou
 
 ## Core focus
 
-Rough volatility path simulation and model comparison. The central piece is the **Rough Bergomi** model — implemented end-to-end from the fractional Brownian kernel through Monte Carlo pricing, calibration, and volatility-surface benchmarking against GBM and Heston.
+Rough volatility path simulation and model comparison. The library implements multiple simulation schemes for each model family — from baseline Euler discretisations to high-accuracy methods — so that convergence rates and computational trade-offs can be measured directly. See [`kernels/rough_model_sim.md`](src/roughvol/kernels/rough_model_sim.md) for the full mathematical reference.
 
 ## Models
 
-| Model | Path simulation | Calibration |
+| Model | Schemes | Calibration |
 |---|---|---|
-| GBM | yes | yes |
-| Heston | yes | yes |
-| Rough Bergomi | yes | yes |
+| GBM | exact log-Euler | yes |
+| Heston | Euler full-truncation | yes |
+| Rough Bergomi | `volterra-midpoint` · `blp-hybrid` · `exact-gaussian` | yes |
+| Rough Heston | `volterra-euler` · `markovian-lift` | — |
 
-All models share the same `PathModel` protocol and run through a unified Monte Carlo engine.
+All models implement the `PathModel` protocol and run through the unified `MonteCarloEngine`.
+
+### Rough Bergomi simulation schemes
+
+| Scheme | Section | Complexity | Notes |
+|---|---|---|---|
+| `volterra-midpoint` (default) | §2.5 | O(n²) | Midpoint Volterra quadrature; fast, mild singularity bias |
+| `blp-hybrid` | §2.3 | O(n log n) | Bennedsen-Lunde-Pakkanen: near-field exact + far-field FFT; practical workhorse |
+| `exact-gaussian` | §2.1 | O(n³) precomp | Cholesky of joint RL-fBM covariance; benchmark quality |
+
+Select with `RoughBergomiModel(..., scheme="blp-hybrid")`.
+
+### Rough Heston simulation schemes
+
+| Scheme | Section | Complexity | Notes |
+|---|---|---|---|
+| `volterra-euler` (default) | §3.1 | O(n²) | Direct Volterra history accumulation; positivity by clipping |
+| `markovian-lift` | §3.5 | O(N·n) | N-factor sum-of-exponentials kernel; exponential integrator for stability |
+
+Select with `RoughHestonModel(..., scheme="markovian-lift", n_factors=8)`.
 
 ## Instruments
 
@@ -25,12 +45,14 @@ All models share the same `PathModel` protocol and run through a unified Monte C
 
 | Package | Purpose |
 |---|---|
-| `roughvol.models` | GBM, Heston, and Rough Bergomi path simulators |
-| `roughvol.kernels` | Fractional Brownian motion kernel for rBergomi |
+| `roughvol.models` | GBM, Heston, Rough Bergomi (3 schemes), Rough Heston (2 schemes) |
+| `roughvol.kernels` | Volterra kernel weights: midpoint, BLP hybrid, exact Cholesky, Rough Heston kernel, Markovian lift fit |
 | `roughvol.engines` | Monte Carlo pricing engine |
+| `roughvol.sim` | Brownian motion primitives (increments, correlated BMs) |
 | `roughvol.analytics` | Black-Scholes closed-form pricing, implied vol, delta |
 | `roughvol.service` | Calibration, windowed calibration toolbox, gRPC server |
 | `roughvol.lab` | Model comparison: vol surface fit and delta-hedge PnL |
+| `roughvol.experiments` | Runnable scripts including scheme convergence study |
 
 ## Setup
 
@@ -43,12 +65,70 @@ make setup
 ## Usage
 
 ```bash
-make test                            # run test suite
+make test                            # run test suite (25 tests)
 make proto-python                    # regenerate gRPC stubs
 make serve                           # start gRPC server
 
-python -m roughvol.experiments.run_model_lab        # benchmark models
+# Experiments
 python -m roughvol.experiments.run_vanilla
 python -m roughvol.experiments.run_asian
 python -m roughvol.experiments.run_compare_gbm_heston
+python -m roughvol.experiments.run_model_lab        # vol surface + delta-hedge benchmark
+python -m roughvol.experiments.run_rough_vol_convergence  # scheme convergence study
+```
+
+## Convergence experiment
+
+`run_rough_vol_convergence` runs all schemes at increasing `n_steps` and plots:
+
+1. **rBergomi error vs n_steps** (log-log) — compares `volterra-midpoint`, `blp-hybrid`, and `exact-gaussian` against a dense reference; BLP should show a steeper convergence slope than midpoint.
+2. **Wall-clock time vs n_steps** — illustrates the O(n²) vs O(n log n) scaling difference.
+3. **Rough Heston price vs n_steps** — `volterra-euler` and `markovian-lift` converging to the reference.
+
+## Project structure
+
+```
+Rough-Pricing/
+├── src/roughvol/
+│   ├── types.py                        # SimConfig, MarketData, PathBundle, PriceResult, protocols
+│   ├── analytics/
+│   │   └── black_scholes_formula.py    # BS price, delta, implied vol
+│   ├── engines/
+│   │   └── mc.py                       # MonteCarloEngine
+│   ├── experiments/
+│   │   ├── run_vanilla.py
+│   │   ├── run_asian.py
+│   │   ├── run_compare_gbm_heston.py
+│   │   ├── run_model_lab.py
+│   │   └── run_rough_vol_convergence.py  # NEW: scheme convergence visualisation
+│   ├── instruments/
+│   │   ├── vanilla.py
+│   │   └── asian.py
+│   ├── kernels/
+│   │   ├── rough_bergomi.py              # midpoint Volterra weights
+│   │   ├── rough_bergomi_blp.py          # NEW: BLP hybrid driver (§2.3)
+│   │   ├── rough_bergomi_exact.py        # NEW: exact Cholesky covariance (§2.1)
+│   │   ├── rough_heston.py               # NEW: Volterra kernel + Markovian lift fit (§3.1, §3.5)
+│   │   └── rough_model_sim.md            # simulation methods reference note
+│   ├── lab/
+│   │   └── model_comparison.py
+│   ├── models/
+│   │   ├── GBM_model.py
+│   │   ├── heston_model.py
+│   │   ├── rough_bergomi_model.py        # extended: scheme dispatch
+│   │   └── rough_heston_model.py         # NEW: RoughHestonModel (§3.1, §3.5)
+│   ├── service/
+│   │   ├── calibration.py
+│   │   ├── toolbox.py
+│   │   ├── servicer.py
+│   │   └── server.py
+│   └── sim/
+│       └── brownian.py
+└── tests/
+    ├── test_MC.py
+    ├── test_asian.py
+    ├── test_calibration_toolbox.py
+    ├── test_model_lab.py
+    ├── test_rough_bergomi.py
+    └── test_rough_heston.py              # NEW: RoughHestonModel tests
 ```
