@@ -173,14 +173,19 @@ Input: grid t_0,...,t_n, H, eta, rho, forward variance xi0(.), S0
 If the object to be simulated can be reduced to a **stationary Gaussian increment sequence** (for example fractional Gaussian noise), then FFT-based exact simulation is possible. The key idea in Davies–Harte is that a **circulant matrix** is diagonalized by the discrete Fourier transform.
 
 If $C$ is a circulant matrix with first row, then each row of it is just a cyclic shift of the previous one. **This shift structure is exactly what makes Fourier modes the right basis, while the covariance can be embedded into a circulant matrix**. For a stationary Gaussian sequence, the covariance matrix has **Toeplitz** form:
+
 $$
 T_n = (r(|i-j|))_{0 \le i,j \le n-1},
 $$
+
 where $r(k)$ is the covariance function. We can build a circulant matrix as a periodic version of a Toeplitz matrix: Choose a larger size $m$ and define the first row by reflecting the covariance sequence:
+
 $$
 c_0 = r(0), \qquad c_k = r(k), \qquad c_{m-k} = r(k), \quad 1 \le k \le n-1.
 $$
+
 Then define the circulant matrix $C$ by
+
 $$
 C_{ij} = c_{(j-i)\bmod m}.
 $$
