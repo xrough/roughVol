@@ -239,7 +239,7 @@ Input: H, number of increments n
 ### Remarks
 
 - This is an exact FFT Gaussian sampler, not a rough-vol path discretization by itself.
-- It is especially useful when one chooses a model representation directly in terms of fBm or fractional Gaussian increments.
+- It is especially useful when one chooses a model representation ** directly in terms of fBm or fractional Gaussian increments**.
 - In practice, it can replace dense-matrix Cholesky when the covariance structure allows it.
 
 ---
