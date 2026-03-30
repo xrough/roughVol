@@ -32,10 +32,12 @@ RB_PARAMS = dict(hurst=0.1, eta=1.9, rho=-0.7, xi0=0.04)
 MARKET_RH = MarketData(spot=100.0, rate=0.05, div_yield=0.0)
 RH_PARAMS = dict(hurst=0.1, lam=0.3, theta=0.04, nu=0.5, rho=-0.7, v0=0.04)
 
-N_PATHS_BENCH = 80_000   # benchmark simulation paths
-N_PATHS_TEST = 20_000    # convergence test paths (each data point)
-N_STEPS_BENCH = 1024     # benchmark grid (used as "truth")
-TEST_STEPS = [8, 16, 32, 64, 128, 256]
+N_PATHS_BENCH = 10_000   # benchmark simulation paths
+N_PATHS_TEST = 4_000     # convergence test paths (each data point)
+N_STEPS_BENCH = 256      # benchmark grid (used as "truth")
+TEST_STEPS = [8, 16, 32, 64]
+# exact-gaussian is O(n^2) quad calls so keep it to a smaller grid
+TEST_STEPS_EXACT = [8, 16, 32]
 
 
 def _price(model, n_steps: int, n_paths: int, seed: int) -> tuple[float, float, float]:
@@ -68,17 +70,20 @@ def run_rough_bergomi_convergence() -> dict:
     results = {"ref_price": ref_price, "bench_steps": N_STEPS_BENCH, "schemes": {}}
 
     for scheme in ["volterra-midpoint", "blp-hybrid", "exact-gaussian"]:
-        print(f"\n  Scheme: {scheme}")
-        prices, errors, times = [], [], []
-        for n in TEST_STEPS:
+        # exact-gaussian has O(n^2) quad calls; keep it to smaller grids
+        steps = TEST_STEPS_EXACT if scheme == "exact-gaussian" else TEST_STEPS
+        print(f"\n  Scheme: {scheme}  (steps={steps})")
+        prices, errors, times, ns = [], [], [], []
+        for n in steps:
             model = RoughBergomiModel(**RB_PARAMS, scheme=scheme)
             p, se, elapsed = _price(model, n_steps=n, n_paths=N_PATHS_TEST, seed=42)
             err = abs(p - ref_price)
             prices.append(p)
             errors.append(err)
             times.append(elapsed)
+            ns.append(n)
             print(f"    n={n:4d}  price={p:.5f}  |err|={err:.5f}  t={elapsed:.3f}s")
-        results["schemes"][scheme] = {"prices": prices, "errors": errors, "times": times}
+        results["schemes"][scheme] = {"prices": prices, "errors": errors, "times": times, "steps": ns}
 
     return results
 
@@ -90,11 +95,11 @@ def run_rough_heston_convergence() -> dict:
     print("=" * 60)
 
     # Benchmark with markovian-lift at fine grid
-    bench_model = RoughHestonModel(**RH_PARAMS, scheme="markovian-lift", n_factors=12)
+    bench_model = RoughHestonModel(**RH_PARAMS, scheme="markovian-lift", n_factors=8)
     bench_engine = MonteCarloEngine(
-        n_paths=N_PATHS_BENCH, n_steps=512, seed=0, antithetic=True
+        n_paths=N_PATHS_BENCH, n_steps=128, seed=0, antithetic=True
     )
-    print(f"  Computing benchmark: n_steps=512, n_paths={N_PATHS_BENCH} ...", end=" ")
+    print(f"  Computing benchmark: n_steps=128, n_paths={N_PATHS_BENCH} ...", end=" ")
     t0 = time.perf_counter()
     bench_res = bench_engine.price(model=bench_model, instrument=INSTRUMENT, market=MARKET_RH)
     bench_elapsed = time.perf_counter() - t0
@@ -105,7 +110,7 @@ def run_rough_heston_convergence() -> dict:
 
     for scheme, n_factors in [("volterra-euler", 8), ("markovian-lift", 8)]:
         print(f"\n  Scheme: {scheme}")
-        prices, errors, times = [], [], []
+        prices, errors, times, ns = [], [], [], []
         for n in TEST_STEPS:
             model = RoughHestonModel(**RH_PARAMS, scheme=scheme, n_factors=n_factors)
             engine = MonteCarloEngine(n_paths=N_PATHS_TEST, n_steps=n, seed=42, antithetic=True)
@@ -116,8 +121,9 @@ def run_rough_heston_convergence() -> dict:
             prices.append(res.price)
             errors.append(err)
             times.append(elapsed)
+            ns.append(n)
             print(f"    n={n:4d}  price={res.price:.5f}  |err|={err:.5f}  t={elapsed:.3f}s")
-        results["schemes"][scheme] = {"prices": prices, "errors": errors, "times": times}
+        results["schemes"][scheme] = {"prices": prices, "errors": errors, "times": times, "steps": ns}
 
     return results
 
@@ -142,27 +148,27 @@ def plot_results(rb_results: dict, rh_results: dict) -> None:
     # Panel 1: rBergomi error vs n_steps (log-log)
     # ------------------------------------------------------------------
     ax1 = axes[0]
+    n_ref_lo = steps[0]
+    n_ref_hi = steps[-1]
+    n_ref = np.array([n_ref_lo, n_ref_hi], dtype=float)
     for scheme, data in rb_results["schemes"].items():
         col, fmt, label = style_map[scheme]
-        errors = np.array(data["errors"])
-        # Replace zero errors (can happen if price==ref exactly) with small floor
-        errors = np.maximum(errors, 1e-7)
-        ax1.loglog(steps, errors, fmt, color=col, label=label, linewidth=1.8, markersize=7)
+        s = np.array(data.get("steps", TEST_STEPS), dtype=float)
+        errors = np.maximum(np.array(data["errors"]), 1e-7)
+        ax1.loglog(s, errors, fmt, color=col, label=label, linewidth=1.8, markersize=7)
 
-    # Reference slope guide-lines: O(n^{H+0.5}) and O(n^1.5) (H=0.1 → O(n^0.6))
+    # Reference slope guide-lines
     H = RB_PARAMS["hurst"]
-    n_ref = np.array([steps[0], steps[-1]])
-    # Normalise guide lines to pass through the first midpoint data point
     mp_err0 = max(rb_results["schemes"]["volterra-midpoint"]["errors"][0], 1e-7)
-    ax1.loglog(n_ref, mp_err0 * (n_ref / steps[0]) ** (-(H + 0.5)),
+    ax1.loglog(n_ref, mp_err0 * (n_ref / n_ref_lo) ** (-(H + 0.5)),
                "k:", linewidth=1, label=f"O(n^{{-{H+0.5:.1f}}}) guide")
     blp_err0 = max(rb_results["schemes"]["blp-hybrid"]["errors"][0], 1e-7)
-    ax1.loglog(n_ref, blp_err0 * (n_ref / steps[0]) ** (-1.5),
+    ax1.loglog(n_ref, blp_err0 * (n_ref / n_ref_lo) ** (-1.5),
                "k--", linewidth=1, label="O(n^{-1.5}) guide")
 
     ax1.set_xlabel("n_steps")
     ax1.set_ylabel("|price - reference|")
-    ax1.set_title("rBergomi: Error vs n_steps\n(reference = midpoint n=1024)")
+    ax1.set_title(f"rBergomi: Error vs n_steps\n(reference = midpoint n={N_STEPS_BENCH})")
     ax1.legend(fontsize=8)
     ax1.grid(True, which="both", alpha=0.3)
 
@@ -172,13 +178,14 @@ def plot_results(rb_results: dict, rh_results: dict) -> None:
     ax2 = axes[1]
     for scheme, data in rb_results["schemes"].items():
         col, fmt, label = style_map[scheme]
-        ax2.loglog(steps, data["times"], fmt, color=col, label=label, linewidth=1.8, markersize=7)
+        s = np.array(data.get("steps", TEST_STEPS), dtype=float)
+        ax2.loglog(s, data["times"], fmt, color=col, label=label, linewidth=1.8, markersize=7)
 
     # O(n^2) and O(n log n) guide lines
     t0_ref = rb_results["schemes"]["volterra-midpoint"]["times"][0]
-    ax2.loglog(n_ref, t0_ref * (n_ref / steps[0]) ** 2, "k:", linewidth=1, label="O(n²) guide")
+    ax2.loglog(n_ref, t0_ref * (n_ref / n_ref_lo) ** 2, "k:", linewidth=1, label="O(n²) guide")
     ax2.loglog(n_ref,
-               t0_ref * (n_ref / steps[0]) * np.log2(n_ref / steps[0] + 1),
+               t0_ref * (n_ref / n_ref_lo) * np.log2(n_ref / n_ref_lo + 1),
                "k--", linewidth=1, label="O(n log n) guide")
 
     ax2.set_xlabel("n_steps")
@@ -194,13 +201,14 @@ def plot_results(rb_results: dict, rh_results: dict) -> None:
     ref_rh = rh_results["ref_price"]
     for scheme, data in rh_results["schemes"].items():
         col, fmt, label = style_map[scheme]
+        s = np.array(data.get("steps", TEST_STEPS), dtype=float)
         prices = np.array(data["prices"])
-        ax3.semilogx(steps, prices, fmt, color=col, label=label, linewidth=1.8, markersize=7)
+        ax3.semilogx(s, prices, fmt, color=col, label=label, linewidth=1.8, markersize=7)
 
     ax3.axhline(ref_rh, color="gray", linestyle="--", linewidth=1, label=f"Reference ({ref_rh:.4f})")
     ax3.set_xlabel("n_steps")
     ax3.set_ylabel("MC price")
-    ax3.set_title("Rough Heston: Price vs n_steps\n(reference = lift n=512)")
+    ax3.set_title("Rough Heston: Price vs n_steps\n(reference = lift n=128)")
     ax3.legend(fontsize=8)
     ax3.grid(True, alpha=0.3)
 

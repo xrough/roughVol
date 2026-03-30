@@ -81,7 +81,7 @@ $$
 X_t := \int_0^t V_s ds,
 $$
 
-and rewrites the dynamics in terms of \(X\) and the martingales
+and rewrites the dynamics in terms of $X$ and the martingales
 
 $$
 M_t^{(i)} := \int_0^t \sqrt{V_s} dW_s^{(i)}.
@@ -170,25 +170,44 @@ Input: grid t_0,...,t_n, H, eta, rho, forward variance xi0(.), S0
 
 ### Idea
 
-If the object to be simulated can be reduced to a **stationary Gaussian increment sequence** (for example fractional Gaussian noise), then FFT-based exact simulation is possible.
+If the object to be simulated can be reduced to a **stationary Gaussian increment sequence** (for example fractional Gaussian noise), then FFT-based exact simulation is possible. The key idea in Davies–Harte is that a **circulant matrix** is diagonalized by the discrete Fourier transform.
 
-This is not a separate rough-vol model, but a separate **Gaussian engine**. It is relevant whenever the Volterra driver or an increment representation is stationary or can be embedded into a stationary sequence.
-
-### Fractional Gaussian noise covariance
-
-For fBm \(B^H\), the increments
-
+If $C$ is a circulant matrix with first row, then each row of it is just a cyclic shift of the previous one. **This shift structure is exactly what makes Fourier modes the right basis, while the covariance can be embedded into a circulant matrix**. For a stationary Gaussian sequence, the covariance matrix has **Toeplitz** form:
 $$
-Y_k = B^H_{k+1} - B^H_k
+T_n = (r(|i-j|))_{0 \le i,j \le n-1},
 $$
-
-are stationary with covariance
-
+where $r(k)$ is the covariance function. We can build a circulant matrix as a periodic version of a Toeplitz matrix: Choose a larger size $m$ and define the first row by reflecting the covariance sequence:
 $$
-\gamma(m) = \frac12\Big((m+1)^{2H} - 2m^{2H} + (m-1)^{2H}\Big), \qquad m\ge 1,
+c_0 = r(0), \qquad c_k = r(k), \qquad c_{m-k} = r(k), \quad 1 \le k \le n-1.
+$$
+Then define the circulant matrix $C$ by
+$$
+C_{ij} = c_{(j-i)\bmod m}.
 $$
 
-and \(\gamma(0)=1\).
+With this symmetric construction, the top-left $n \times n$ block of $C$ matches the original Toeplitz covariance:
+$$
+C_{ij} = r(|i-j|), \qquad 0 \le i,j \le n-1.
+$$
+So the original covariance matrix appears as a submatrix of a larger circulant one. On the other hand, **Fourier modes are eigenvectors**: For each frequency $j=0,\dots,m-1$, define the vector
+$$
+v^{(j)} = \big(1,\omega^j,\omega^{2j},\dots,\omega^{(m-1)j}\big)^\top,
+\qquad \omega = e^{-2\pi i/m}.
+$$
+These are the discrete Fourier basis vectors. Because $C$ acts by cyclic convolution, applying $C$ to $v^{(j)}$ gives
+$$
+Cv^{(j)} = \lambda_j v^{(j)},
+$$
+where
+$$
+\lambda_j = \sum_{k=0}^{m-1} c_k \omega^{jk}.
+$$
+So each Fourier mode forms an eigenvector, and the corresponding eigenvalue is exactly the DFT of the first row. So Davies–Harte works by:
+
+1. embedding the target Toeplitz covariance into a larger **circulant** covariance,
+2. using the FFT to diagonalize that circulant matrix,
+3. sampling independent Gaussian Fourier modes,
+4. applying the inverse FFT to return to physical space.
 
 ### Pseudocode
 
@@ -285,7 +304,7 @@ Input: grid t_0,...,t_n, singular exponent alpha = H-1/2, cutoff kappa, kernel g
 
 ### Remarks
 
-- Complexity is typically \(O(n\log n)\) because of the FFT convolution.
+- Complexity is typically $O(n\log n)$ because of the FFT convolution.
 - This is the most common workhorse for rough Bergomi Monte Carlo.
 - It is approximate, but usually very accurate for singular Volterra kernels.
 
@@ -299,13 +318,13 @@ Replace Brownian motion by a scaled random walk, then push it through the fracti
 
 ### Discrete formulas
 
-On a grid \(t_i=i\Delta t\), let \((\xi_i)\) be i.i.d. centered, variance-one random variables. Define
+On a grid $t_i=i\Delta t$, let $(\xi_i)$ be i.i.d. centered, variance-one random variables. Define
 
 $$
 W_n(t_i)=\sqrt{\Delta t}\sum_{k=1}^i \xi_k.
 $$
 
-For a Volterra operator \(\mathcal G^\alpha\), write the discrete convolution
+For a Volterra operator $\mathcal G^\alpha$, write the discrete convolution
 
 $$
 (\mathcal G^\alpha W_n)(t_i)
@@ -346,7 +365,7 @@ Input: grid t_0,...,t_n, i.i.d. innovations xi_i, kernel weights g_j
 
 ### Tree version
 
-If the innovations are Bernoulli \(\pm1\), the same construction yields a recombining/nonrecombining fractional tree approximation that can be combined with backward induction for Bermudan or American claims.
+If the innovations are Bernoulli $\pm1$, the same construction yields a recombining/nonrecombining fractional tree approximation that can be combined with backward induction for Bermudan or American claims.
 
 ### Remarks
 
@@ -371,7 +390,7 @@ $$
 X_{t_i} \approx \sum_{j=0}^{i-1} g(t_i-t_j)\,\Delta W_j.
 $$
 
-For rough kernels \(g(u)\sim u^{H-1/2}\), this is the simplest route but performs poorly near the singularity unless the grid is fine or special corrections are added.
+For rough kernels $g(u)\sim u^{H-1/2}$, this is the simplest route but performs poorly near the singularity unless the grid is fine or special corrections are added.
 
 ### Pseudocode
 
@@ -428,7 +447,7 @@ replace pseudorandom Gaussians by low-discrepancy points mapped to Gaussian spac
 
 ### 2.6.3 Multilevel Monte Carlo
 
-Given a hierarchy of grid sizes \(\Delta t_\ell\), use
+Given a hierarchy of grid sizes $\Delta t_\ell$, use
 
 $$
 \mathbb E[P_L] = \mathbb E[P_0] + \sum_{\ell=1}^L \mathbb E[P_\ell - P_{\ell-1}],
@@ -461,7 +480,7 @@ $$
 
 ### Explicit time-stepping formula
 
-On a grid \(t_i=i\Delta t\), a left-point Euler-type discretization is
+On a grid $t_i=i\Delta t$, a left-point Euler-type discretization is
 
 $$
 V_{i+1}
@@ -502,7 +521,7 @@ Input: grid, kernel K, parameters lambda, theta, nu, rho, V0, S0
 
 - This is the most direct discrete-time scheme.
 - It has quadratic cost because each new time step uses the entire history.
-- Positivity is delicate; clipping \((V_j)_+\) is common in implementations.
+- Positivity is delicate; clipping $(V_j)_+$ is common in implementations.
 
 ---
 
@@ -516,7 +535,7 @@ $$
 X_t=\int_0^t V_s ds,
 $$
 
-rather than directly with \(V\), because some path functionals and convergence arguments are cleaner in this representation.
+rather than directly with $V$, because some path functionals and convergence arguments are cleaner in this representation.
 
 ### Formulation
 
@@ -526,9 +545,9 @@ $$
 X_t = V_0 t + \int_0^t K(t-s)\big(\theta s - \lambda X_s + \nu M_s\big)ds,
 $$
 
-where \(M_t = \int_0^t \sqrt{V_u}\,dW_u\) and \(d\langle M\rangle_t = V_t dt\).
+where $M_t = \int_0^t \sqrt{V_u}\,dW_u$ and $d\langle M\rangle_t = V_t dt$.
 
-A discrete approximation evolves \(X_i\), then recovers
+A discrete approximation evolves $X_i$, then recovers
 
 $$
 V_i \approx \frac{X_i - X_{i-1}}{\Delta t}
@@ -570,7 +589,7 @@ In practice this means storing the past path and repeatedly recomputing convolut
 
 ### Generic form
 
-If the model is represented by a forward variance curve \(\xi_t(u)\), then on a grid one approximates
+If the model is represented by a forward variance curve $\xi_t(u)$, then on a grid one approximates
 
 $$
 \int_0^{t_i} K(t_i-s) f(V_s)\,ds
@@ -607,7 +626,7 @@ This is an important practical scheme associated with Gatheral’s AFV simulatio
 
 ### Moment inputs
 
-At time step \(n\), compute or approximate
+At time step $n$, compute or approximate
 
 $$
 m_n = \mathbb E[V_{n+1}\mid \mathcal F_{t_n}],
@@ -619,14 +638,14 @@ $$
 
 ### QE branch formulas
 
-If \(\psi_n \le \psi_c\), use the quadratic-Gaussian branch
+If $\psi_n \le \psi_c$, use the quadratic-Gaussian branch
 
 $$
 V_{n+1} = a_n (b_n + Z)^2,
 \qquad Z\sim N(0,1),
 $$
 
-where \(a_n,b_n\) are chosen so that
+where $a_n,b_n$ are chosen so that
 
 $$
 \mathbb E[V_{n+1}\mid \mathcal F_{t_n}] = m_n,
@@ -634,7 +653,7 @@ $$
 \mathrm{Var}(V_{n+1}\mid \mathcal F_{t_n}) = s_n^2.
 $$
 
-If \(\psi_n > \psi_c\), use the atom-plus-exponential branch
+If $\psi_n > \psi_c$, use the atom-plus-exponential branch
 
 $$
 V_{n+1} = 0 \quad \text{with probability } p_n,
@@ -647,7 +666,7 @@ V_{n+1} = \frac{1}{\beta_n}\log\!\left(\frac{1-p_n}{1-U}\right),
 \qquad U\sim \mathrm{Unif}(0,1),
 $$
 
-with \(p_n,\beta_n\) chosen to match \(m_n\) and \(s_n^2\).
+with $p_n,\beta_n$ chosen to match $m_n$ and $s_n^2$.
 
 ### Pseudocode
 
@@ -690,7 +709,7 @@ $$
 K(t) \approx K_N(t) = \sum_{m=1}^N w_m e^{-x_m t}.
 $$
 
-This lifts the non-Markovian model to an \(N\)-factor Markov diffusion.
+This lifts the non-Markovian model to an $N$-factor Markov diffusion.
 
 ### Factor representation
 
@@ -739,7 +758,7 @@ Input: weights w_m, mean reversions x_m, parameters lambda, theta, nu, rho
 
 - This is arguably the most important general-purpose route for rough Heston in current practice.
 - Once the lift is in place, one can use many standard Markov diffusion discretizations.
-- Complexity becomes linear in the number of time steps, up to the factor dimension \(N\).
+- Complexity becomes linear in the number of time steps, up to the factor dimension $N$.
 
 ---
 
@@ -751,14 +770,14 @@ Start from the multi-factor Markovian lift and then use a **weak simulation sche
 
 ### Generic one-step structure
 
-Given the Markovian state at time \(t_n\), compute conditional moments of the one-step variance proxy and replace the true increment by a discrete random variable \(\zeta_n\) supported on a few nonnegative points, chosen so that
+Given the Markovian state at time $t_n$, compute conditional moments of the one-step variance proxy and replace the true increment by a discrete random variable $\zeta_n$ supported on a few nonnegative points, chosen so that
 
 $$
 \mathbb E[\zeta_n^k\mid \mathcal F_{t_n}] = \text{target moment } k,
 \qquad k=1,\dots,r.
 $$
 
-Then update the factors using \(\zeta_n\) instead of a Gaussian/Euler increment.
+Then update the factors using $\zeta_n$ instead of a Gaussian/Euler increment.
 
 ### Pseudocode
 
@@ -789,7 +808,7 @@ Input: Markovian lift with N factors
 
 ### Idea
 
-Instead of simulating the spot variance directly, simulate the **integrated Volterra square-root process** using an Inverse Gaussian-based construction. This is designed for singular \(L^1\) kernels and is particularly promising in the rough or hyper-rough regime.
+Instead of simulating the spot variance directly, simulate the **integrated Volterra square-root process** using an Inverse Gaussian-based construction. This is designed for singular $L^1$ kernels and is particularly promising in the rough or hyper-rough regime.
 
 ### Generic integrated setup
 
@@ -799,7 +818,7 @@ $$
 X_t = \int_0^t V_s ds.
 $$
 
-The iVi philosophy is to update \(X\) using only integrated-kernel quantities, then recover the variance increment from the increment of \(X\). The scheme is implicit in integrated form and preserves monotonicity of \(X\).
+The iVi philosophy is to update $X$ using only integrated-kernel quantities, then recover the variance increment from the increment of $X$. The scheme is implicit in integrated form and preserves monotonicity of $X$.
 
 A rough finite-difference recovery is
 
@@ -827,7 +846,7 @@ Input: grid, integrated kernel quantities, Volterra square-root parameters
 
 - This is recent and specialized, but it belongs in a comprehensive list.
 - Its appeal is not speed alone; it is designed around positivity and singular kernels.
-- It appears especially strong when \(H\downarrow -1/2\).
+- It appears especially strong when $H\downarrow -1/2$.
 
 ---
 
@@ -908,13 +927,13 @@ A truly broad list should include all of the following categories.
 | Exact Gaussian factorization | Simulate full Gaussian vector exactly | high | automatic for lognormal variance | benchmark for rBergomi |
 | Davies–Harte / circulant | FFT exact Gaussian increments | low to moderate | automatic for lognormal variance | large Gaussian grids |
 | Direct Gaussian convolution | literal Volterra sum | quadratic | automatic for lognormal variance | baseline / pedagogy |
-| BLP hybrid | singular near field + FFT far field | \(O(n\log n)\) | automatic for lognormal variance | standard rough Bergomi MC |
+| BLP hybrid | singular near field + FFT far field | $O(n\log n)$ | automatic for lognormal variance | standard rough Bergomi MC |
 | rDonsker | random-walk approximation of Volterra driver | moderate | automatic for lognormal variance | weak convergence, trees |
-| Volterra Euler | direct rough Heston discretization | \(O(n^2)\) | clipping/truncation often used | baseline rough Heston paths |
-| Integrated Euler | discretize integrated variance form | \(O(n^2)\) | somewhat indirect | integrated-variance payoffs |
-| HQE | match conditional moments | \(O(n^2)\) | built into one-step law | practical rough Heston |
-| Markovian lift + Euler | sum-of-exponentials kernel approximation | \(O(Nn)\) | via Markovian variance proxy | general-purpose rough Heston |
-| Markovian weak scheme | moment-matching on lifted model | \(O(Nn)\) | built into one-step law | option pricing, Bermudans |
+| Volterra Euler | direct rough Heston discretization | $O(n^2)$ | clipping/truncation often used | baseline rough Heston paths |
+| Integrated Euler | discretize integrated variance form | $O(n^2)$ | somewhat indirect | integrated-variance payoffs |
+| HQE | match conditional moments | $O(n^2)$ | built into one-step law | practical rough Heston |
+| Markovian lift + Euler | sum-of-exponentials kernel approximation | $O(Nn)$ | via Markovian variance proxy | general-purpose rough Heston |
+| Markovian weak scheme | moment-matching on lifted model | $O(Nn)$ | built into one-step law | option pricing, Bermudans |
 | iVi | IG update for integrated process | problem-dependent | designed to preserve monotonicity / positivity | singular kernels, very rough regime |
 
 ---
@@ -956,9 +975,9 @@ Apply optional Longstaff-Schwartz if the lifted model is Markovian and the payof
 
 ## 7. Implementation warnings
 
-1. **Near-singularity handling matters.** Naive Riemann sums for kernels \(u^{H-1/2}\) are often much less accurate than hybrid or Markovian-lift methods.
+1. **Near-singularity handling matters.** Naive Riemann sums for kernels $u^{H-1/2}$ are often much less accurate than hybrid or Markovian-lift methods.
 2. **Do not confuse path generation with variance reduction.** Turbocharging, QMC, sparse grids, and MLMC accelerate Monte Carlo but do not define new rough-vol paths.
-3. **Rough Heston positivity is nontrivial.** Simple Euler on \(V\) often needs clipping/truncation and may still perform poorly.
+3. **Rough Heston positivity is nontrivial.** Simple Euler on $V$ often needs clipping/truncation and may still perform poorly.
 4. **Markovian lifts change the problem class.** After a sum-of-exponentials approximation, standard Markovian tools become available, including regression-based Bermudan pricing.
 5. **Model class matters.** Methods that are natural for Gaussian rough-vol models need not transfer directly to affine Volterra models.
 
