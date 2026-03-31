@@ -1,6 +1,6 @@
 # Rough Pricing
 
-A self-contained Python research lab for derivative pricing and calibration under stochastic and rough volatility models. The project is intentionally minimal: no external service layer, no packaging — just the simulation, analytics, calibration, and experiment scripts needed to study roughness empirically.
+A self-contained Python research lab for **derivative pricing and calibration under stochastic and rough volatility models**. The project is intentionally minimal: just the simulation, analytics, calibration, and experiment scripts needed to study roughness empirically.
 
 ## Core focus
 
@@ -64,8 +64,6 @@ pip install -r requirements.txt   # or: pip install numpy scipy pandas matplotli
 ## Usage
 
 ```bash
-make test                                              # run test suite (22 tests)
-
 # Experiments
 python -m roughvol.experiments.run_vanilla             # basic vanilla pricing check
 python -m roughvol.experiments.run_model_lab           # vol surface fit + delta-hedge PnL
