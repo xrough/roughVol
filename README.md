@@ -1,6 +1,6 @@
 # Rough Pricing
 
-A Python lab for derivative pricing and calibration under stochastic and rough volatility models, with a gRPC service layer designed to plug into a larger pricing engine.
+A self-contained Python research lab for derivative pricing and calibration under stochastic and rough volatility models. The project is intentionally minimal: no external service layer, no packaging — just the simulation, analytics, calibration, and experiment scripts needed to study roughness empirically.
 
 ## Core focus
 
@@ -38,49 +38,45 @@ Select with `RoughHestonModel(..., scheme="markovian-lift", n_factors=8)`.
 
 ## Instruments
 
-- European vanilla options
-- Arithmetic Asian options
+- European vanilla options (call and put)
 
 ## Key packages
 
 | Package | Purpose |
 |---|---|
 | `roughvol.models` | GBM, Heston, Rough Bergomi (3 schemes), Rough Heston (2 schemes) |
-| `roughvol.kernels` | Volterra kernel weights: midpoint, BLP hybrid, exact Cholesky, Rough Heston kernel, Markovian lift fit |
+| `roughvol.kernels` | Pure math: Volterra midpoint weights, exact Cholesky, Rough Heston kernel, Markovian lift fit |
+| `roughvol.sim` | Brownian motion primitives (`brownian.py`) and fBM / Volterra driver simulation (`volterra.py`) |
 | `roughvol.engines` | Monte Carlo pricing engine |
-| `roughvol.sim` | Brownian motion primitives (increments, correlated BMs) |
 | `roughvol.analytics` | Black-Scholes closed-form pricing, implied vol, delta |
-| `roughvol.service` | Calibration, windowed calibration toolbox, gRPC server |
+| `roughvol.calibration` | Calibration routines and windowed calibration toolbox |
 | `roughvol.lab` | Model comparison: vol surface fit and delta-hedge PnL |
 | `roughvol.experiments` | Runnable scripts including scheme convergence study |
 
 ## Setup
 
 ```bash
-python3 bootstrap/setup.py
-# or
-make setup
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt   # or: pip install numpy scipy pandas matplotlib
 ```
 
 ## Usage
 
 ```bash
-make test                            # run test suite (25 tests)
-make proto-python                    # regenerate gRPC stubs
-make serve                           # start gRPC server
+make test                                              # run test suite (22 tests)
 
 # Experiments
-python -m roughvol.experiments.run_vanilla
-python -m roughvol.experiments.run_asian
-python -m roughvol.experiments.run_compare_gbm_heston
-python -m roughvol.experiments.run_model_lab        # vol surface + delta-hedge benchmark
+python -m roughvol.experiments.run_vanilla             # basic vanilla pricing check
+python -m roughvol.experiments.run_model_lab           # vol surface fit + delta-hedge PnL
 python -m roughvol.experiments.run_rough_vol_convergence  # scheme convergence study
 ```
 
 ## Convergence experiment
 
-`run_rough_vol_convergence` runs all schemes at increasing `n_steps` and plots:
+`run_rough_vol_convergence` runs all rBergomi schemes at increasing `n_steps` and plots:
 
-1. **rBergomi error vs n_steps** (log-log) — compares `volterra-midpoint`, `blp-hybrid`, and `exact-gaussian` against a dense reference; BLP should show a steeper convergence slope than midpoint.
-2. **Wall-clock time vs n_steps** — illustrates the O(n²) vs O(n log n) scaling difference.
-3. **Rough Heston price vs n_steps** — `volterra-euler` and `markovian-lift` converging to the reference.
+1. **rBergomi weak error vs n_steps** (log-log) — `volterra-midpoint`, `blp-hybrid`, and `exact-gaussian` measured against a dense `exact-gaussian` reference at n=32. BLP converges to the same limit as exact at far fewer steps than midpoint.
+2. **Wall-clock time vs n_steps** — illustrates the O(n²) vs O(n log n) vs O(n³) scaling difference.
+
+The reference is `exact-gaussian` at n=32 (already converged, unlike midpoint at n=256 which still carries a large discretisation bias at small H).
