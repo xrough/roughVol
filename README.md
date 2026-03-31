@@ -1,6 +1,6 @@
 # Rough Pricing
 
-A Python library for derivative pricing and calibration under stochastic and rough volatility models, with a gRPC service layer designed to plug into a larger pricing engine.
+A Python lab for derivative pricing and calibration under stochastic and rough volatility models, with a gRPC service layer designed to plug into a larger pricing engine.
 
 ## Core focus
 

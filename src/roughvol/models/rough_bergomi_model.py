@@ -4,10 +4,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from roughvol.kernels import rough_bergomi_midpoint_weights
-from roughvol.kernels.rough_bergomi_blp import rough_bergomi_blp_driver
-from roughvol.kernels.rough_bergomi_exact import rough_bergomi_exact_cholesky
 from roughvol.sim.brownian import correlated_brownian_increments
+from roughvol.sim.volterra import simulate_blp, simulate_exact, simulate_midpoint
 from roughvol.types import MarketData, PathBundle, SimConfig
 
 _VALID_SCHEMES = ("volterra-midpoint", "exact-gaussian", "blp-hybrid")
@@ -139,9 +137,7 @@ class RoughBergomiModel:
         dW_y *= np.sqrt(dt)[None, :]
         dW_s *= np.sqrt(dt)[None, :]
 
-        weights = rough_bergomi_midpoint_weights(t, H)
-        Y = np.zeros((n_paths, n_times), dtype=float)
-        Y[:, 1:] = dW_y @ weights.T
+        Y = simulate_midpoint(dW_y, t, H)
 
         var, S = _var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q, n_steps, n_paths)
 
@@ -163,48 +159,14 @@ class RoughBergomiModel:
         self, *, t, dt, n_steps, n_paths, antithetic, H, eta, rho, xi0,
         S0, r, q, xi_curve, rng,
     ) -> PathBundle:
-        """Exact Gaussian simulation via Cholesky of joint (Wtilde, W) covariance (§2.1)."""
+        """Exact Gaussian simulation via Cholesky of joint (Ytilde, W) covariance (§2.1)."""
         n_times = n_steps + 1
 
-        # Build Cholesky factor once (O(n^3) precomputation)
-        L = rough_bergomi_exact_cholesky(t, H)  # (2n, 2n)
-        n = n_steps  # number of non-zero time points
+        Y, dW_y = simulate_exact(t, H, n_paths, antithetic=antithetic, rng=rng)
 
-        # Sample raw Gaussians and apply Cholesky
-        def _sample_block(rng_local):
-            Z = rng_local.standard_normal((2 * n, n_paths))  # (2n, n_paths)
-            X = L @ Z  # (2n, n_paths)
-            Wtilde = X[:n, :].T  # (n_paths, n)
-            W = X[n:, :].T      # (n_paths, n)
-            return Wtilde, W
-
-        if antithetic:
-            half = n_paths // 2
-            Z_half = rng.standard_normal((2 * n, half))
-            X_half = L @ Z_half
-            Wtilde_pos = X_half[:n, :].T
-            W_pos = X_half[n:, :].T
-            # Antithetic: negate the Gaussians (Wtilde and W are both linear in Z)
-            Wtilde_neg = -Wtilde_pos
-            W_neg = -W_pos
-            Wtilde = np.concatenate([Wtilde_pos, Wtilde_neg], axis=0)  # (n_paths, n)
-            W = np.concatenate([W_pos, W_neg], axis=0)
-        else:
-            Z = rng.standard_normal((2 * n, n_paths))
-            X = L @ Z
-            Wtilde = X[:n, :].T  # (n_paths, n)
-            W = X[n:, :].T       # (n_paths, n)
-
-        # BM increments from the simulated level paths
-        dW_y = np.diff(np.concatenate([np.zeros((n_paths, 1)), W], axis=1), axis=1)  # (n_paths, n)
-
-        # Orthogonal BM increments for spot correlation
+        # Orthogonal BM increments for spot; combine with variance-driver BM for correlation
         dWperp = rng.standard_normal((n_paths, n_steps)) * np.sqrt(dt)[None, :]
         dW_s = rho * dW_y + np.sqrt(1.0 - rho ** 2) * dWperp
-
-        # Build full Ytilde = (0, Wtilde_t1, ..., Wtilde_tn)
-        Y = np.zeros((n_paths, n_times), dtype=float)
-        Y[:, 1:] = Wtilde
 
         var, S = _var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q, n_steps, n_paths)
 
@@ -238,8 +200,8 @@ class RoughBergomiModel:
         dW_y *= np.sqrt(dt)[None, :]
         dW_s *= np.sqrt(dt)[None, :]
 
-        # BLP driver returns Y of shape (n_paths, n_times)
-        Y = rough_bergomi_blp_driver(dW_y, t, H, kappa=kappa, rng=rng)
+        # BLP scheme returns Y of shape (n_paths, n_times)
+        Y = simulate_blp(dW_y, t, H, kappa=kappa, rng=rng)
 
         var, S = _var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q, n_steps, n_paths)
 
