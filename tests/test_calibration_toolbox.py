@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from roughvol.analytics.black_scholes_formula import bs_price
-from roughvol.service.toolbox import CalibrationToolbox
+from roughvol.calibration.toolbox import CalibrationToolbox
 
 
 def test_windowed_calibration_reuses_cached_snapshot_within_interval():

@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from roughvol.service.calibration import (
+from roughvol.calibration.calibration import (
     BSCalibrator,
     CalibResult,
     make_gbm_calibrator,

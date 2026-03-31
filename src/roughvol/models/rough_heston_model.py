@@ -10,7 +10,6 @@ from roughvol.types import MarketData, PathBundle, SimConfig
 
 _VALID_SCHEMES = ("volterra-euler", "markovian-lift")
 
-
 @dataclass(frozen=True)
 class RoughHestonModel:
     """Rough Heston stochastic volatility model with selectable simulation scheme.

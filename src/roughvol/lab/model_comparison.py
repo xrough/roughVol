@@ -12,8 +12,8 @@ from roughvol.instruments.vanilla import VanillaOption
 from roughvol.models.GBM_model import GBM_Model
 from roughvol.models.heston_model import HestonModel
 from roughvol.models.rough_bergomi_model import RoughBergomiModel
-from roughvol.service.calibration import CalibResult
-from roughvol.service.toolbox import CalibrationToolbox
+from roughvol.calibration.calibration import CalibResult
+from roughvol.calibration.toolbox import CalibrationToolbox
 from roughvol.types import MarketData, SimConfig, make_rng
 
 
