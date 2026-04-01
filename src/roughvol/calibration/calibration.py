@@ -152,29 +152,81 @@ class MCCalibrator:
         t0 = time.perf_counter()
         market = MarketData(spot=spot, rate=rate, div_yield=div)
 
-        instruments = [
-            VanillaOption(
-                strike=float(row["strike"]),
-                maturity=float(row["maturity_years"]),
-                is_call=bool(row["is_call"]),
+        # ── Precompute market implied vols ─────────────────────────────────
+        # The loss is minimised in IV space: MSE = mean((σ_model − σ_market)²).
+        # This weights every option equally regardless of its dollar price, so
+        # OTM options (which carry the smile/skew signal) are not drowned out
+        # by ATM options.  Options whose market price violates no-arb bounds
+        # are silently dropped; if none survive, an error is raised.
+        instruments: list[VanillaOption] = []
+        market_ivs: list[float] = []
+        skipped = 0
+
+        for _, row in options_df.iterrows():
+            try:
+                iv = implied_vol(
+                    price=float(row["market_price"]),
+                    spot=spot,
+                    strike=float(row["strike"]),
+                    maturity=float(row["maturity_years"]),
+                    rate=rate,
+                    div=div,
+                    is_call=bool(row["is_call"]),
+                )
+                instruments.append(VanillaOption(
+                    strike=float(row["strike"]),
+                    maturity=float(row["maturity_years"]),
+                    is_call=bool(row["is_call"]),
+                ))
+                market_ivs.append(iv)
+            except (ValueError, ZeroDivisionError):
+                skipped += 1
+
+        if not instruments:
+            raise RuntimeError(
+                f"[{self.model_name}] No valid options after IV computation "
+                "— check market prices vs no-arb bounds"
             )
-            for _, row in options_df.iterrows()
-        ]
-        market_prices = options_df["market_price"].values.astype(float)
+        if skipped:
+            print(f"[{self.model_name}] Warning: {skipped} option(s) dropped "
+                  "(market price outside no-arb bounds)")
+
+        market_ivs_arr = np.array(market_ivs)
+
+        # ── IV-space loss function ─────────────────────────────────────────
+        # At each optimizer step: price all options via MC, invert to model IVs,
+        # compute MSE vs pre-computed market IVs.
+        # If the MC price falls outside no-arb bounds (common with small n_paths),
+        # a 50 vol-point penalty is applied so the optimizer moves away from that
+        # region rather than crashing.
+        _PENALTY_IV = 0.50   # 50 vol points — large enough to dominate the loss
 
         call_count = [0]
 
         def loss_fn(x: np.ndarray) -> float:
             call_count[0] += 1
             model = self.model_factory(x)
-            mc_prices = np.array([
-                self._engine.price(model=model, instrument=inst, market=market).price
-                for inst in instruments
-            ])
-            return float(np.mean((mc_prices - market_prices) ** 2))
+            iv_errors: list[float] = []
+            for inst, iv_mkt in zip(instruments, market_ivs_arr):
+                try:
+                    pr = self._engine.price(model=model, instrument=inst, market=market)
+                    iv_model = implied_vol(
+                        price=pr.price,
+                        spot=spot,
+                        strike=inst.strike,
+                        maturity=inst.maturity,
+                        rate=rate,
+                        div=div,
+                        is_call=inst.is_call,
+                    )
+                    iv_errors.append(iv_model - iv_mkt)
+                except (ValueError, Exception):
+                    iv_errors.append(_PENALTY_IV)
+            return float(np.mean(np.array(iv_errors) ** 2))
 
         print(f"[{self.model_name}] Starting optimisation  "
-              f"(params: {self.param_names}, x0: {[f'{v:.4f}' for v in self.x0]})")
+              f"(params: {self.param_names}, x0: {[f'{v:.4f}' for v in self.x0]}, "
+              f"n_options: {len(instruments)}, loss: IV-MSE)")
 
         result = minimize(
             loss_fn,
@@ -185,16 +237,16 @@ class MCCalibrator:
         )
 
         best_x = result.x
-        best_mse = float(result.fun)
+        best_iv_mse = float(result.fun)
         elapsed = time.perf_counter() - t0
 
         print(f"[{self.model_name}] Done  iters={call_count[0]}  "
-              f"MSE={best_mse:.3e}  elapsed={elapsed:.1f}s")
+              f"IV-MSE={best_iv_mse:.3e}  elapsed={elapsed:.1f}s")
 
         return CalibResult(
             model_name=self.model_name,
             params={name: float(val) for name, val in zip(self.param_names, best_x)},
-            mse=best_mse,
+            mse=best_iv_mse,
             elapsed_s=elapsed,
         )
 
@@ -253,14 +305,25 @@ def make_rough_bergomi_calibrator(
     x0_sigma: float = 0.20,
     x0: list[float] | None = None,
     engine_kwargs: dict | None = None,
+    scheme: str = "blp-hybrid",
 ) -> MCCalibrator:
-    """MCCalibrator for RoughBergomiModel (4 params)."""
+    """MCCalibrator for RoughBergomiModel (4 params).
+
+    Parameters
+    ----------
+    scheme : simulation scheme passed to RoughBergomiModel during optimisation.
+        "blp-hybrid"      — O(n log n), exact near-field kernel, default.
+        "volterra-midpoint" — O(n²), simpler but biased near the singularity.
+        "exact-gaussian"  — O(n³) precompute, benchmark quality.
+    """
     from roughvol.models.rough_bergomi_model import RoughBergomiModel
 
     default_x0 = [0.1, 1.5, -0.7, x0_sigma ** 2]
     raw_x0 = list(x0) if x0 else default_x0
     if len(raw_x0) != 4:
         raise ValueError("rough Bergomi warm start x0 must have four values")
+
+    _scheme = scheme  # capture in closure
 
     return MCCalibrator(
         model_name="RoughBergomi",
@@ -269,6 +332,7 @@ def make_rough_bergomi_calibrator(
             eta=float(x[1]),
             rho=float(x[2]),
             xi0=float(x[3]),
+            scheme=_scheme,
         ),
         param_names=["hurst", "eta", "rho", "xi0"],
         bounds=[
