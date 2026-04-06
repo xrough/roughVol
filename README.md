@@ -119,7 +119,7 @@ The recovered Hurst exponent H ≈ 0.08 is consistent with the empirical literat
 
 ## Empirical roughness demo
 
-`run_empirical_roughness_demo` fetches historical prices and the current listed option chain from yfinance for one or more tickers (`SPY`, `AAPL`, `MSFT` by default). It then:
+`run_empirical_roughness_demo` fetches historical prices and the current listed option chain from yfinance for one or more tickers (`SPY` by default). It then:
 
 - builds non-overlapping realized-variance blocks from close-to-close returns at the chosen sampling interval
 - de-seasonalizes intraday returns by time-of-day before constructing those blocks
@@ -141,6 +141,22 @@ It now saves four grouped figure files across the requested ticker set:
 Each figure contains one panel per ticker, so the outputs are split by topic rather than mixed into one per-ticker dashboard.
 
 The realized-volatility figure now gives each ticker a full-sample block-volatility panel and a separate high-frequency local-vol zoom over the last four hours so local roughness is easier to inspect visually.
+
+You can also ask for a cross-sectional Hurst histogram across a large-cap stock universe ranked by live market cap, for example:
+
+```bash
+python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 50
+python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 100
+```
+
+When enabled, the script adds a histogram figure such as `empirical_roughness_hurst_histogram_top50.png` showing the distribution of estimated Hurst exponents across the top `N` names that were successfully processed.
+
+The script also keeps a lightweight JSON cache of estimated Hurst summaries at `empirical_roughness_cache.json` by default, so repeated histogram runs can reuse prior estimates instead of recomputing every stock each time. You can override or bypass that behavior with:
+
+```bash
+python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 100 --cache-path custom_cache.json
+python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 100 --refresh-cache
+```
 
 ## Convergence experiment
 

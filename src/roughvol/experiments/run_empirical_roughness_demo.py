@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import math
 import sys
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from pathlib import Path
 
 import matplotlib
 
@@ -37,6 +39,7 @@ except ImportError as exc:
 
 from roughvol.analytics.black_scholes_formula import implied_vol
 from roughvol.analytics.roughness import (
+    RoughnessEstimate,
     _session_keys,
     estimate_hurst_exponent,
     local_volatility_proxy,
@@ -54,6 +57,21 @@ SIMULATION_HORIZON = 1.0
 SIMULATION_VOL_OF_VOL = 1.35
 REALIZED_VOL_ZOOM_HOURS = 4
 LOCAL_VOL_WINDOW_RETURNS = 5
+CACHE_VERSION = 1
+DEFAULT_CACHE_PATH = "empirical_roughness_cache.json"
+LARGE_CAP_CANDIDATE_TICKERS = [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "BRK-B", "TSM", "AVGO", "TSLA",
+    "JPM", "LLY", "WMT", "V", "XOM", "UNH", "ORCL", "MA", "NFLX", "COST",
+    "JNJ", "HD", "PG", "ABBV", "BAC", "KO", "SAP", "ASML", "CVX", "TMUS",
+    "CRM", "AMD", "NVO", "CSCO", "MRK", "WFC", "PM", "IBM", "MCD", "LIN",
+    "AXP", "ABT", "GS", "GE", "DIS", "NOW", "CAT", "TXN", "ISRG", "QCOM",
+    "BKNG", "T", "VZ", "RTX", "INTU", "AMGN", "UBER", "PFE", "MS", "SPGI",
+    "BLK", "PLTR", "SYK", "NEE", "ADBE", "ETN", "TJX", "HON", "PGR", "SCHW",
+    "CMCSA", "MU", "UNP", "VRTX", "BSX", "COP", "C", "PANW", "DE", "ANET",
+    "BMY", "LOW", "SBUX", "FI", "AMAT", "MDT", "LRCX", "INTC", "ADI", "MMC",
+    "KKR", "GILD", "AMT", "DHR", "CB", "SO", "NKE", "MO", "BA", "ELV",
+    "ICE", "MDLZ", "DUK", "CI", "UPS", "MELI", "TT", "REGN", "APH", "TTD",
+]
 
 
 def output_figure_name(kind: str) -> str:
@@ -64,6 +82,19 @@ def stable_seed_from_ticker(ticker_symbol: str) -> int:
     """Create a reproducible but ticker-specific simulation seed."""
     digest = hashlib.blake2b(ticker_symbol.upper().encode("ascii"), digest_size=8).digest()
     return int.from_bytes(digest, byteorder="big") % (2**32 - 1)
+
+
+def cache_key(ticker_symbol: str, *, interval: str, period: str | None, rv_block_size: int) -> str:
+    """Build a deterministic key for a cached roughness estimate."""
+    resolved_period = "" if period is None else period
+    return f"{ticker_symbol.upper()}|{interval.lower()}|{resolved_period}|{rv_block_size}"
+
+
+def rank_tickers_by_market_cap(market_caps: dict[str, float], top_n: int) -> list[str]:
+    """Return tickers ranked by descending market cap."""
+    valid_items = [(ticker, cap) for ticker, cap in market_caps.items() if cap > 0.0]
+    ranked = sorted(valid_items, key=lambda item: item[1], reverse=True)
+    return [ticker for ticker, _ in ranked[:top_n]]
 
 
 def default_period_for_interval(interval: str) -> str:
@@ -217,6 +248,80 @@ def recent_intraday_zoom_series(
     return latest_session_series.iloc[-zoom_count:]
 
 
+def get_market_cap(ticker_symbol: str) -> float:
+    """Fetch a best-effort market cap for ranking the cross-sectional universe."""
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        fast_info = getattr(ticker, "fast_info", None)
+        if fast_info:
+            try:
+                market_cap = fast_info.get("marketCap")
+            except AttributeError:
+                market_cap = getattr(fast_info, "marketCap", None)
+            if market_cap:
+                return float(market_cap)
+        info = ticker.info
+        market_cap = info.get("marketCap") if info else None
+        if market_cap:
+            return float(market_cap)
+    except Exception:
+        pass
+    return 0.0
+
+
+def load_estimate_cache(cache_path: str) -> dict:
+    """Load cached H-estimate summaries from disk."""
+    path = Path(cache_path)
+    if not path.exists():
+        return {"version": CACHE_VERSION, "entries": {}}
+
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {"version": CACHE_VERSION, "entries": {}}
+
+    if payload.get("version") != CACHE_VERSION or not isinstance(payload.get("entries"), dict):
+        return {"version": CACHE_VERSION, "entries": {}}
+    return payload
+
+
+def save_estimate_cache(cache_path: str, cache_payload: dict) -> None:
+    """Persist cached H-estimate summaries to disk."""
+    path = Path(cache_path)
+    path.write_text(json.dumps(cache_payload, indent=2, sort_keys=True))
+
+
+def cache_entry_from_report(report: dict) -> dict:
+    """Extract the reusable scalar roughness summary from a full report."""
+    roughness = report["roughness"]
+    return {
+        "ticker": report["ticker"],
+        "interval": report["interval"],
+        "period": report["period"],
+        "rv_block_size": report["rv_block_size"],
+        "hurst": roughness.hurst,
+        "r_squared": roughness.r_squared,
+        "latest_annualized_volatility": float(report["realized_variance_blocks"]["annualized_volatility"].iloc[-1]),
+        "cached_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+
+
+def histogram_report_from_cache_entry(entry: dict) -> dict:
+    """Convert a cached scalar summary back into the minimal report needed for a histogram."""
+    return {
+        "ticker": entry["ticker"],
+        "roughness": RoughnessEstimate(
+            hurst=float(entry["hurst"]),
+            intercept=0.0,
+            r_squared=float(entry["r_squared"]),
+            lags=np.array([], dtype=float),
+            structure_function=np.array([], dtype=float),
+            fitted_structure_function=np.array([], dtype=float),
+        ),
+        "from_cache": True,
+    }
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Empirically estimate rough volatility from yfinance history and option data.",
@@ -225,7 +330,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "tickers",
         nargs="*",
         default=DEFAULT_TICKERS,
-        help="Ticker symbols to analyze. Defaults to SPY AAPL MSFT.",
+        help="Ticker symbols to analyze. Defaults to SPY.",
     )
     parser.add_argument(
         "--interval",
@@ -249,6 +354,22 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         dest="rv_block_size_alias",
         default=None,
         help="Deprecated alias for --rv-block-size.",
+    )
+    parser.add_argument(
+        "--hurst-hist-top-n",
+        type=int,
+        default=0,
+        help="If > 0, rank a large-cap universe by market cap and plot a histogram of H estimates for the top N names.",
+    )
+    parser.add_argument(
+        "--cache-path",
+        default=DEFAULT_CACHE_PATH,
+        help="Path to the JSON cache used to reuse H estimates across runs.",
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="Ignore cached H estimates and recompute them from fresh data.",
     )
     return parser.parse_args(argv)
 
@@ -593,10 +714,117 @@ def plot_simulation_reports(reports: list[dict], output_path: str) -> None:
     plt.close(fig)
 
 
+def build_hurst_histogram_reports(
+    *,
+    top_n: int,
+    interval: str,
+    period: str | None,
+    rv_block_size: int,
+    cached_reports: dict[str, dict] | None = None,
+    cache_entries: dict[str, dict] | None = None,
+    refresh_cache: bool = False,
+) -> tuple[list[dict], list[str]]:
+    """Estimate H across a live large-cap cross-section ranked by market cap."""
+    if top_n <= 0:
+        return [], []
+
+    market_caps = {
+        ticker: get_market_cap(ticker)
+        for ticker in LARGE_CAP_CANDIDATE_TICKERS
+    }
+    ranked_tickers = rank_tickers_by_market_cap(market_caps, top_n)
+
+    reports: list[dict] = []
+    failures: list[str] = []
+    in_memory_reports = cached_reports or {}
+    persisted_entries = cache_entries or {}
+
+    for idx, ticker_symbol in enumerate(ranked_tickers, start=1):
+        print(f"[Histogram] {idx}/{len(ranked_tickers)} {ticker_symbol}")
+        if ticker_symbol in in_memory_reports:
+            reports.append(in_memory_reports[ticker_symbol])
+            continue
+
+        key = cache_key(
+            ticker_symbol,
+            interval=interval,
+            period=period or default_period_for_interval(interval),
+            rv_block_size=rv_block_size,
+        )
+        if not refresh_cache and key in persisted_entries:
+            print("  using cached H estimate")
+            reports.append(histogram_report_from_cache_entry(persisted_entries[key]))
+            continue
+
+        try:
+            report = build_empirical_roughness_report(
+                ticker_symbol,
+                interval=interval,
+                period=period,
+                rv_block_size=rv_block_size,
+            )
+        except Exception:
+            failures.append(ticker_symbol)
+            continue
+
+        reports.append(report)
+        in_memory_reports[ticker_symbol] = report
+        persisted_entries[key] = cache_entry_from_report(report)
+
+    return reports, failures
+
+
+def plot_hurst_histogram(reports: list[dict], output_path: str, *, top_n: int) -> None:
+    """Plot the cross-sectional histogram of estimated Hurst exponents."""
+    hursts = np.array([report["roughness"].hurst for report in reports], dtype=float)
+    tickers = [report["ticker"] for report in reports]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bins = min(40, max(16, int(np.sqrt(len(hursts)) * 3)))
+    ax.hist(hursts, bins=bins, color="slateblue", edgecolor="white", alpha=0.85)
+    mean_h = float(np.mean(hursts))
+    median_h = float(np.median(hursts))
+    ax.axvline(mean_h, color="crimson", linestyle="--", linewidth=1.6, label=f"Mean H = {mean_h:.2f}")
+    ax.axvline(median_h, color="black", linestyle="-.", linewidth=1.4, label=f"Median H = {median_h:.2f}")
+    ax.set_title(f"Estimated Hurst exponents across top {top_n} stocks by market cap")
+    ax.set_xlabel("Estimated H")
+    ax.set_ylabel("Number of stocks")
+    ax.legend()
+    ax.grid(alpha=0.2)
+
+    summary = (
+        f"n={len(hursts)} successful estimates\n"
+        f"{sum(hursts < 0.5)} below 0.50\n"
+        f"min={hursts.min():.2f}, max={hursts.max():.2f}"
+    )
+    ax.text(
+        0.98,
+        0.98,
+        summary,
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
+    )
+
+    lowest = np.argsort(hursts)[: min(5, len(hursts))]
+    lowest_text = ", ".join(f"{tickers[i]} ({hursts[i]:.2f})" for i in lowest)
+    fig.text(0.5, 0.01, f"Lowest H names: {lowest_text}", ha="center", fontsize=9)
+
+    fig.tight_layout(rect=(0, 0.03, 1, 1))
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+
+
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     tickers = [ticker.upper() for ticker in args.tickers if ticker.strip()]
     reports: list[dict] = []
+    cached_reports: dict[str, dict] = {}
+    rv_block_size = args.rv_block_size_alias or args.rv_block_size
+    cache_payload = load_estimate_cache(args.cache_path)
+    cache_entries = cache_payload["entries"]
+    cache_dirty = False
 
     for ticker_symbol in tickers:
         print("=" * 70)
@@ -607,13 +835,22 @@ def main(argv: list[str] | None = None) -> None:
                 ticker_symbol,
                 interval=args.interval,
                 period=args.period,
-                rv_block_size=args.rv_block_size_alias or args.rv_block_size,
+                rv_block_size=rv_block_size,
             )
         except Exception as exc:
             print(f"Failed for {ticker_symbol}: {exc}")
             continue
 
         reports.append(report)
+        cached_reports[ticker_symbol] = report
+        entry_key = cache_key(
+            ticker_symbol,
+            interval=report["interval"],
+            period=report["period"],
+            rv_block_size=report["rv_block_size"],
+        )
+        cache_entries[entry_key] = cache_entry_from_report(report)
+        cache_dirty = True
         estimate = report["roughness"]
         print(f"Spot: {report['market'].spot:.2f}")
         print(
@@ -650,23 +887,62 @@ def main(argv: list[str] | None = None) -> None:
         print()
 
     if not reports:
-        print("No figures were generated because all ticker runs failed.")
-        return
+        print("No per-ticker figures were generated because all requested ticker runs failed.")
 
-    output_paths = {
-        "realized_vol": output_figure_name("realized_vol"),
-        "roughness_regression": output_figure_name("roughness_regression"),
-        "atm_term_structure": output_figure_name("atm_term_structure"),
-        "simulation": output_figure_name("simulation"),
-    }
-    plot_realized_vol_reports(reports, output_paths["realized_vol"])
-    plot_roughness_regression_reports(reports, output_paths["roughness_regression"])
-    plot_atm_term_structure_reports(reports, output_paths["atm_term_structure"])
-    plot_simulation_reports(reports, output_paths["simulation"])
+    output_paths: dict[str, str] = {}
+    if reports:
+        output_paths.update(
+            {
+                "realized_vol": output_figure_name("realized_vol"),
+                "roughness_regression": output_figure_name("roughness_regression"),
+                "atm_term_structure": output_figure_name("atm_term_structure"),
+                "simulation": output_figure_name("simulation"),
+            }
+        )
+        plot_realized_vol_reports(reports, output_paths["realized_vol"])
+        plot_roughness_regression_reports(reports, output_paths["roughness_regression"])
+        plot_atm_term_structure_reports(reports, output_paths["atm_term_structure"])
+        plot_simulation_reports(reports, output_paths["simulation"])
 
-    print("Saved figures:")
-    for output_path in output_paths.values():
-        print(f"  {output_path}")
+    if args.hurst_hist_top_n > 0:
+        print("=" * 70)
+        print(f"Cross-sectional Hurst histogram for top {args.hurst_hist_top_n} stocks")
+        print("=" * 70)
+        cache_size_before = len(cache_entries)
+        hist_reports, failures = build_hurst_histogram_reports(
+            top_n=args.hurst_hist_top_n,
+            interval=args.interval,
+            period=args.period,
+            rv_block_size=rv_block_size,
+            cached_reports=cached_reports,
+            cache_entries=cache_entries,
+            refresh_cache=args.refresh_cache,
+        )
+        if hist_reports:
+            hist_key = f"hurst_histogram_top{args.hurst_hist_top_n}"
+            output_paths[hist_key] = output_figure_name(hist_key)
+            plot_hurst_histogram(
+                hist_reports,
+                output_paths[hist_key],
+                top_n=args.hurst_hist_top_n,
+            )
+            print(
+                f"Histogram sample: {len(hist_reports)} successful estimates"
+                + (f", {len(failures)} failures" if failures else "")
+            )
+            cache_dirty = cache_dirty or (len(cache_entries) > cache_size_before)
+        else:
+            print("Histogram figure was not generated because no H estimates succeeded.")
+
+    if cache_dirty:
+        save_estimate_cache(args.cache_path, cache_payload)
+
+    if output_paths:
+        print("Saved figures:")
+        for output_path in output_paths.values():
+            print(f"  {output_path}")
+        if cache_dirty:
+            print(f"Updated cache: {args.cache_path}")
 
 
 if __name__ == "__main__":
