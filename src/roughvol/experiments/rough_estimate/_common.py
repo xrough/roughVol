@@ -14,7 +14,9 @@ from roughvol.experiments.rough_estimate.run_empirical_roughness_demo import (
     cache_entry_from_report,
     cache_key,
     get_market_cap,
+    load_or_build_empirical_roughness_report,
     load_estimate_cache,
+    rank_large_cap_candidates,
     rank_tickers_by_market_cap,
     save_estimate_cache,
 )
@@ -27,25 +29,34 @@ def parse_report_args(description: str) -> argparse.Namespace:
     parser.add_argument("--period", default=None)
     parser.add_argument("--rv-block-size", type=int, default=DEFAULT_RV_BLOCK_SIZE)
     parser.add_argument("--window", type=int, dest="rv_block_size_alias", default=None)
+    parser.add_argument("--cache-path", default=DEFAULT_CACHE_PATH)
+    parser.add_argument("--refresh-cache", action="store_true")
     return parser.parse_args()
 
 
 def build_reports(args: argparse.Namespace) -> list[dict]:
     rv_block_size = args.rv_block_size_alias or args.rv_block_size
+    cache_payload = load_estimate_cache(args.cache_path)
     reports = []
     for ticker_symbol in [ticker.upper() for ticker in args.tickers]:
         print(f"[RoughEstimate] {ticker_symbol}")
         try:
-            report = build_empirical_roughness_report(
+            report, rebuilt = load_or_build_empirical_roughness_report(
                 ticker_symbol,
                 interval=args.interval,
                 period=args.period,
                 rv_block_size=rv_block_size,
+                cache_entries=cache_payload["entries"],
+                refresh_cache=args.refresh_cache,
             )
         except Exception as exc:
             print(f"  failed: {exc}")
             continue
+        if not rebuilt:
+            print("  using cached full report")
         reports.append(report)
+    if reports:
+        save_estimate_cache(args.cache_path, cache_payload)
     return reports
 
 
@@ -63,24 +74,29 @@ def parse_ranked_report_args(description: str, *, allow_explicit_tickers: bool =
 
 
 def build_ranked_full_reports(args: argparse.Namespace) -> tuple[list[dict], list[str]]:
+    cache_payload = load_estimate_cache(args.cache_path)
     explicit = [ticker.upper() for ticker in getattr(args, "tickers", []) if ticker.strip()]
     if explicit:
         tickers = explicit
     else:
-        market_caps = {ticker: get_market_cap(ticker) for ticker in LARGE_CAP_CANDIDATE_TICKERS}
-        tickers = rank_tickers_by_market_cap(market_caps, args.top_n)
+        tickers = rank_large_cap_candidates(
+            args.top_n,
+            cache_payload=cache_payload,
+            refresh_cache=args.refresh_cache,
+        )
 
-    cache_payload = load_estimate_cache(args.cache_path)
     reports: list[dict] = []
     failures: list[str] = []
     for idx, ticker_symbol in enumerate(tickers, start=1):
         print(f"[RoughEstimate] {idx}/{len(tickers)} {ticker_symbol}")
         try:
-            report = build_empirical_roughness_report(
+            report, rebuilt = load_or_build_empirical_roughness_report(
                 ticker_symbol,
                 interval=args.interval,
                 period=args.period,
                 rv_block_size=args.rv_block_size,
+                cache_entries=cache_payload["entries"],
+                refresh_cache=args.refresh_cache,
             )
         except Exception as exc:
             print(f"  failed: {exc}")
@@ -88,13 +104,8 @@ def build_ranked_full_reports(args: argparse.Namespace) -> tuple[list[dict], lis
             continue
 
         reports.append(report)
-        entry_key = cache_key(
-            ticker_symbol,
-            interval=report["interval"],
-            period=report["period"],
-            rv_block_size=report["rv_block_size"],
-        )
-        cache_payload["entries"][entry_key] = cache_entry_from_report(report)
+        if not rebuilt:
+            print("  using cached full report")
 
     if reports:
         save_estimate_cache(args.cache_path, cache_payload)
@@ -109,6 +120,7 @@ def build_hurst_reports(args: argparse.Namespace) -> tuple[list[dict], list[str]
         period=args.period,
         rv_block_size=args.rv_block_size,
         cache_entries=cache_payload["entries"],
+        cache_payload=cache_payload,
         refresh_cache=args.refresh_cache,
     )
     if reports:

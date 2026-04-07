@@ -5,11 +5,9 @@ from __future__ import annotations
 import sys
 
 from roughvol.experiments.rough_estimate.run_empirical_roughness_demo import (
-    build_empirical_roughness_report,
     build_hurst_histogram_reports,
-    cache_entry_from_report,
-    cache_key,
     load_estimate_cache,
+    load_or_build_empirical_roughness_report,
     output_figure_name,
     parse_args,
     plot_atm_term_structure_reports,
@@ -37,11 +35,13 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Empirical roughness demo for {ticker_symbol}")
         print("=" * 70)
         try:
-            report = build_empirical_roughness_report(
+            report, rebuilt = load_or_build_empirical_roughness_report(
                 ticker_symbol,
                 interval=args.interval,
                 period=args.period,
                 rv_block_size=rv_block_size,
+                cache_entries=cache_entries,
+                refresh_cache=args.refresh_cache,
             )
         except Exception as exc:
             print(f"Failed for {ticker_symbol}: {exc}")
@@ -49,14 +49,10 @@ def main(argv: list[str] | None = None) -> None:
 
         reports.append(report)
         cached_reports[ticker_symbol] = report
-        entry_key = cache_key(
-            ticker_symbol,
-            interval=report["interval"],
-            period=report["period"],
-            rv_block_size=report["rv_block_size"],
-        )
-        cache_entries[entry_key] = cache_entry_from_report(report)
-        cache_dirty = True
+        if rebuilt:
+            cache_dirty = True
+        else:
+            print("Using cached full report.")
 
     if not reports:
         print("No per-ticker figures were generated because all requested ticker runs failed.")
@@ -85,6 +81,7 @@ def main(argv: list[str] | None = None) -> None:
             rv_block_size=rv_block_size,
             cached_reports=cached_reports,
             cache_entries=cache_entries,
+            cache_payload=cache_payload,
             refresh_cache=args.refresh_cache,
         )
         if hist_reports:
@@ -100,7 +97,7 @@ def main(argv: list[str] | None = None) -> None:
                 f"Histogram sample: {len(hist_reports)} successful estimates"
                 + (f", {len(failures)} failures" if failures else ""),
             )
-            cache_dirty = True
+            cache_dirty = cache_dirty or bool(failures) or any(not report.get("from_cache", False) for report in hist_reports)
         else:
             print("Histogram figure was not generated because no H estimates succeeded.")
 

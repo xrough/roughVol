@@ -21,6 +21,7 @@ import json
 import math
 import sys
 from datetime import UTC, date, datetime
+from io import StringIO
 from pathlib import Path
 
 import matplotlib
@@ -49,6 +50,7 @@ from roughvol.analytics.roughness import (
 )
 from roughvol.data.yfinance_loader import get_market_data, get_price_history
 from roughvol.experiments._paths import output_path
+from roughvol.types import MarketData
 
 DEFAULT_TICKERS = ["SPY"]
 DEFAULT_PRICE_HISTORY_INTERVAL = "1m"
@@ -271,19 +273,60 @@ def get_market_cap(ticker_symbol: str) -> float:
     return 0.0
 
 
+def cached_market_cap(
+    ticker_symbol: str,
+    *,
+    cache_payload: dict,
+    refresh_cache: bool = False,
+) -> float:
+    """Return a cached market cap when available, otherwise fetch and store it."""
+    market_cap_entries = cache_payload.setdefault("market_caps", {})
+    if not refresh_cache:
+        cached = market_cap_entries.get(ticker_symbol)
+        if isinstance(cached, dict) and "market_cap" in cached:
+            return float(cached["market_cap"])
+
+    market_cap = get_market_cap(ticker_symbol)
+    market_cap_entries[ticker_symbol] = {
+        "market_cap": float(market_cap),
+        "cached_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+    return float(market_cap)
+
+
+def rank_large_cap_candidates(
+    top_n: int,
+    *,
+    cache_payload: dict,
+    refresh_cache: bool = False,
+) -> list[str]:
+    """Rank the large-cap universe using cached-or-live market caps."""
+    market_caps = {
+        ticker: cached_market_cap(
+            ticker,
+            cache_payload=cache_payload,
+            refresh_cache=refresh_cache,
+        )
+        for ticker in LARGE_CAP_CANDIDATE_TICKERS
+    }
+    return rank_tickers_by_market_cap(market_caps, top_n)
+
+
 def load_estimate_cache(cache_path: str) -> dict:
     """Load cached H-estimate summaries from disk."""
     path = Path(cache_path)
     if not path.exists():
-        return {"version": CACHE_VERSION, "entries": {}}
+        return {"version": CACHE_VERSION, "entries": {}, "market_caps": {}}
 
     try:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
-        return {"version": CACHE_VERSION, "entries": {}}
+        return {"version": CACHE_VERSION, "entries": {}, "market_caps": {}}
 
     if payload.get("version") != CACHE_VERSION or not isinstance(payload.get("entries"), dict):
-        return {"version": CACHE_VERSION, "entries": {}}
+        return {"version": CACHE_VERSION, "entries": {}, "market_caps": {}}
+    if not isinstance(payload.get("market_caps"), dict):
+        payload["market_caps"] = {}
     return payload
 
 
@@ -293,10 +336,30 @@ def save_estimate_cache(cache_path: str, cache_payload: dict) -> None:
     path.write_text(json.dumps(cache_payload, indent=2, sort_keys=True))
 
 
+def series_to_cache_payload(series: pd.Series) -> str:
+    """Serialize a series for JSON cache storage."""
+    return series.to_json(date_format="iso", date_unit="ns")
+
+
+def series_from_cache_payload(payload: str) -> pd.Series:
+    """Deserialize a cached series payload."""
+    return pd.read_json(StringIO(payload), typ="series")
+
+
+def dataframe_to_cache_payload(frame: pd.DataFrame) -> str:
+    """Serialize a dataframe for JSON cache storage."""
+    return frame.to_json(orient="split", date_format="iso", date_unit="ns")
+
+
+def dataframe_from_cache_payload(payload: str) -> pd.DataFrame:
+    """Deserialize a cached dataframe payload."""
+    return pd.read_json(StringIO(payload), orient="split")
+
+
 def cache_entry_from_report(report: dict) -> dict:
-    """Extract the reusable scalar roughness summary from a full report."""
+    """Extract the reusable summary and full plotting payload from a report."""
     roughness = report["roughness"]
-    return {
+    entry = {
         "ticker": report["ticker"],
         "interval": report["interval"],
         "period": report["period"],
@@ -306,6 +369,55 @@ def cache_entry_from_report(report: dict) -> dict:
         "latest_annualized_volatility": float(report["realized_variance_blocks"]["annualized_volatility"].iloc[-1]),
         "cached_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
+
+    full_report_keys = {
+        "market",
+        "close",
+        "intraday_mode",
+        "rv_block_label",
+        "annualization",
+        "local_volatility",
+        "log_realized_variance",
+        "atm_term_structure",
+        "simulation_time",
+        "simulation_seed",
+        "rough_vol_path",
+        "brownian_vol_path",
+        "clipped_hurst",
+    }
+    roughness_keys = {"intercept", "lags", "structure_function", "fitted_structure_function"}
+    if not full_report_keys.issubset(report.keys()) or not roughness_keys.issubset(vars(roughness).keys()):
+        return entry
+
+    entry["full_report"] = {
+            "market": {
+                "spot": float(report["market"].spot),
+                "rate": float(report["market"].rate),
+                "div_yield": float(report["market"].div_yield),
+            },
+            "close": series_to_cache_payload(report["close"]),
+            "intraday_mode": bool(report["intraday_mode"]),
+            "rv_block_label": report["rv_block_label"],
+            "annualization": float(report["annualization"]),
+            "realized_variance_blocks": dataframe_to_cache_payload(report["realized_variance_blocks"]),
+            "local_volatility": series_to_cache_payload(report["local_volatility"]),
+            "log_realized_variance": series_to_cache_payload(report["log_realized_variance"]),
+            "roughness": {
+                "hurst": float(roughness.hurst),
+                "intercept": float(roughness.intercept),
+                "r_squared": float(roughness.r_squared),
+                "lags": roughness.lags.tolist(),
+                "structure_function": roughness.structure_function.tolist(),
+                "fitted_structure_function": roughness.fitted_structure_function.tolist(),
+            },
+            "atm_term_structure": dataframe_to_cache_payload(report["atm_term_structure"]),
+            "simulation_time": report["simulation_time"].tolist(),
+            "simulation_seed": int(report["simulation_seed"]),
+            "rough_vol_path": report["rough_vol_path"].tolist(),
+            "brownian_vol_path": report["brownian_vol_path"].tolist(),
+            "clipped_hurst": float(report["clipped_hurst"]),
+    }
+    return entry
 
 
 def histogram_report_from_cache_entry(entry: dict) -> dict:
@@ -322,6 +434,82 @@ def histogram_report_from_cache_entry(entry: dict) -> dict:
         ),
         "from_cache": True,
     }
+
+
+def full_report_from_cache_entry(entry: dict) -> dict:
+    """Convert a cached full-report payload back into the report structure used by plots."""
+    full_report = entry.get("full_report")
+    if not isinstance(full_report, dict):
+        raise KeyError("cached entry does not contain a full empirical report")
+
+    roughness_payload = full_report["roughness"]
+    return {
+        "ticker": entry["ticker"],
+        "market": MarketData(
+            spot=float(full_report["market"]["spot"]),
+            rate=float(full_report["market"]["rate"]),
+            div_yield=float(full_report["market"]["div_yield"]),
+        ),
+        "close": series_from_cache_payload(full_report["close"]),
+        "interval": entry["interval"],
+        "intraday_mode": bool(full_report["intraday_mode"]),
+        "period": entry["period"],
+        "rv_block_size": int(entry["rv_block_size"]),
+        "rv_block_label": full_report["rv_block_label"],
+        "annualization": float(full_report["annualization"]),
+        "realized_variance_blocks": dataframe_from_cache_payload(full_report["realized_variance_blocks"]),
+        "local_volatility": series_from_cache_payload(full_report["local_volatility"]),
+        "log_realized_variance": series_from_cache_payload(full_report["log_realized_variance"]),
+        "roughness": RoughnessEstimate(
+            hurst=float(roughness_payload["hurst"]),
+            intercept=float(roughness_payload["intercept"]),
+            r_squared=float(roughness_payload["r_squared"]),
+            lags=np.array(roughness_payload["lags"], dtype=float),
+            structure_function=np.array(roughness_payload["structure_function"], dtype=float),
+            fitted_structure_function=np.array(roughness_payload["fitted_structure_function"], dtype=float),
+        ),
+        "atm_term_structure": dataframe_from_cache_payload(full_report["atm_term_structure"]),
+        "simulation_time": np.array(full_report["simulation_time"], dtype=float),
+        "simulation_seed": int(full_report["simulation_seed"]),
+        "rough_vol_path": np.array(full_report["rough_vol_path"], dtype=float),
+        "brownian_vol_path": np.array(full_report["brownian_vol_path"], dtype=float),
+        "clipped_hurst": float(full_report["clipped_hurst"]),
+        "from_cache": True,
+    }
+
+
+def load_or_build_empirical_roughness_report(
+    ticker_symbol: str,
+    *,
+    interval: str,
+    period: str | None,
+    rv_block_size: int,
+    cache_entries: dict[str, dict] | None = None,
+    refresh_cache: bool = False,
+) -> tuple[dict, bool]:
+    """Return a full report from cache when available, otherwise rebuild it."""
+    resolved_period = period or default_period_for_interval(interval)
+    key = cache_key(
+        ticker_symbol,
+        interval=interval,
+        period=resolved_period,
+        rv_block_size=rv_block_size,
+    )
+    if not refresh_cache and cache_entries is not None and key in cache_entries:
+        try:
+            return full_report_from_cache_entry(cache_entries[key]), False
+        except (KeyError, TypeError, ValueError, OSError):
+            pass
+
+    report = build_empirical_roughness_report(
+        ticker_symbol,
+        interval=interval,
+        period=period,
+        rv_block_size=rv_block_size,
+    )
+    if cache_entries is not None:
+        cache_entries[key] = cache_entry_from_report(report)
+    return report, True
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -724,17 +912,25 @@ def build_hurst_histogram_reports(
     rv_block_size: int,
     cached_reports: dict[str, dict] | None = None,
     cache_entries: dict[str, dict] | None = None,
+    cache_payload: dict | None = None,
     refresh_cache: bool = False,
 ) -> tuple[list[dict], list[str]]:
     """Estimate H across a live large-cap cross-section ranked by market cap."""
     if top_n <= 0:
         return [], []
 
-    market_caps = {
-        ticker: get_market_cap(ticker)
-        for ticker in LARGE_CAP_CANDIDATE_TICKERS
-    }
-    ranked_tickers = rank_tickers_by_market_cap(market_caps, top_n)
+    if cache_payload is not None:
+        ranked_tickers = rank_large_cap_candidates(
+            top_n,
+            cache_payload=cache_payload,
+            refresh_cache=refresh_cache,
+        )
+    else:
+        market_caps = {
+            ticker: get_market_cap(ticker)
+            for ticker in LARGE_CAP_CANDIDATE_TICKERS
+        }
+        ranked_tickers = rank_tickers_by_market_cap(market_caps, top_n)
 
     reports: list[dict] = []
     failures: list[str] = []
@@ -754,9 +950,15 @@ def build_hurst_histogram_reports(
             rv_block_size=rv_block_size,
         )
         if not refresh_cache and key in persisted_entries:
-            print("  using cached H estimate")
-            reports.append(histogram_report_from_cache_entry(persisted_entries[key]))
-            continue
+            entry = persisted_entries[key]
+            try:
+                print("  using cached full report")
+                reports.append(full_report_from_cache_entry(entry))
+                continue
+            except (KeyError, TypeError, ValueError, OSError):
+                print("  using cached H estimate")
+                reports.append(histogram_report_from_cache_entry(entry))
+                continue
 
         try:
             report = build_empirical_roughness_report(
@@ -832,25 +1034,23 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Empirical roughness demo for {ticker_symbol}")
         print("=" * 70)
         try:
-            report = build_empirical_roughness_report(
+            report, rebuilt = load_or_build_empirical_roughness_report(
                 ticker_symbol,
                 interval=args.interval,
                 period=args.period,
                 rv_block_size=rv_block_size,
+                cache_entries=cache_entries,
+                refresh_cache=args.refresh_cache,
             )
         except Exception as exc:
             print(f"Failed for {ticker_symbol}: {exc}")
             continue
 
         cached_reports[ticker_symbol] = report
-        entry_key = cache_key(
-            ticker_symbol,
-            interval=report["interval"],
-            period=report["period"],
-            rv_block_size=report["rv_block_size"],
-        )
-        cache_entries[entry_key] = cache_entry_from_report(report)
-        cache_dirty = True
+        if rebuilt:
+            cache_dirty = True
+        else:
+            print("Using cached full report.")
         estimate = report["roughness"]
         print(f"Spot: {report['market'].spot:.2f}")
         print(
@@ -901,6 +1101,7 @@ def main(argv: list[str] | None = None) -> None:
             rv_block_size=rv_block_size,
             cached_reports=cached_reports,
             cache_entries=cache_entries,
+            cache_payload=cache_payload,
             refresh_cache=args.refresh_cache,
         )
         if hist_reports:

@@ -11,7 +11,11 @@ from roughvol.experiments.calibration.run_calibration_demo import collect_calibr
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    results = collect_calibration_results(args.tickers)
+    results = collect_calibration_results(
+        args.tickers,
+        cache_path=args.cache_path,
+        refresh_cache=args.refresh_cache,
+    )
     if not results:
         return
 

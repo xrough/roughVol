@@ -12,6 +12,7 @@ from roughvol.experiments.rough_estimate.run_empirical_roughness_demo import (  
     cache_entry_from_report,
     cache_key,
     default_period_for_interval,
+    full_report_from_cache_entry,
     histogram_report_from_cache_entry,
     load_estimate_cache,
     parse_args,
@@ -20,6 +21,8 @@ from roughvol.experiments.rough_estimate.run_empirical_roughness_demo import (  
     save_estimate_cache,
     stable_seed_from_ticker,
 )
+from roughvol.analytics.roughness import RoughnessEstimate  # noqa: E402
+from roughvol.types import MarketData  # noqa: E402
 
 
 def test_default_interval_is_one_minute():
@@ -97,6 +100,61 @@ def test_cache_round_trip_restores_histogram_summary(tmp_path):
     assert cached_report["ticker"] == "SPY"
     assert cached_report["roughness"].hurst == 0.14
     assert cached_report["roughness"].r_squared == 0.97
+
+
+def test_cache_round_trip_restores_full_empirical_report():
+    index = pd.date_range("2024-01-02 09:30:00", periods=3, freq="1min")
+    report = {
+        "ticker": "SPY",
+        "market": MarketData(spot=500.0, rate=0.04, div_yield=0.01),
+        "close": pd.Series([500.0, 501.0, 499.0], index=index, dtype=float),
+        "interval": "1m",
+        "intraday_mode": True,
+        "period": "7d",
+        "rv_block_size": 30,
+        "rv_block_label": "30min RV blocks",
+        "annualization": 98280.0,
+        "realized_variance_blocks": pd.DataFrame(
+            {
+                "raw_realized_variance": [0.0012],
+                "annualized_volatility": [0.19],
+                "n_returns": [30],
+            },
+            index=pd.DatetimeIndex([index[-1]]),
+        ),
+        "local_volatility": pd.Series([0.17, 0.18], index=index[-2:], dtype=float),
+        "log_realized_variance": pd.Series([-6.7], index=pd.DatetimeIndex([index[-1]]), dtype=float),
+        "roughness": RoughnessEstimate(
+            hurst=0.14,
+            intercept=-0.2,
+            r_squared=0.97,
+            lags=pd.Series([1.0, 2.0]).to_numpy(),
+            structure_function=pd.Series([0.1, 0.2]).to_numpy(),
+            fitted_structure_function=pd.Series([0.11, 0.19]).to_numpy(),
+        ),
+        "atm_term_structure": pd.DataFrame(
+            {
+                "days_to_expiry": [30],
+                "implied_vol": [0.22],
+            }
+        ),
+        "simulation_time": pd.Series([0.0, 1.0]).to_numpy(),
+        "simulation_seed": 123,
+        "rough_vol_path": pd.Series([0.2, 0.25]).to_numpy(),
+        "brownian_vol_path": pd.Series([0.2, 0.23]).to_numpy(),
+        "clipped_hurst": 0.14,
+    }
+
+    restored = full_report_from_cache_entry(cache_entry_from_report(report))
+
+    assert restored["ticker"] == "SPY"
+    assert restored["market"].spot == 500.0
+    assert restored["interval"] == "1m"
+    assert restored["intraday_mode"] is True
+    assert list(restored["close"].values) == [500.0, 501.0, 499.0]
+    assert restored["roughness"].hurst == 0.14
+    assert restored["realized_variance_blocks"]["annualized_volatility"].iloc[-1] == 0.19
+    assert restored["simulation_seed"] == 123
 
 
 def test_recent_intraday_zoom_series_uses_last_couple_of_hours():

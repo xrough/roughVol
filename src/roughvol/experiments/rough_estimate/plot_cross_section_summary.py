@@ -49,7 +49,7 @@ def main(argv: list[str] | None = None) -> None:
     intercept = float(np.mean(np.log(median_structure) - median_h * np.log(common_lags)))
     fitted = np.exp(intercept + median_h * np.log(common_lags))
 
-    fig, scaling_ax = plt.subplots(figsize=(8.8, 6.2))
+    fig, scaling_ax = plt.subplots(figsize=(8.8, 4.5))
 
     for report in scaling_reports:
         roughness = report["roughness"]
@@ -63,16 +63,15 @@ def main(argv: list[str] | None = None) -> None:
     scaling_ax.fill_between(common_lags, q25, q75, color=PALE_BLUE, alpha=0.65, label="Interquartile band")
     scaling_ax.loglog(common_lags, median_structure, color=DEEP_BLUE, linewidth=2.2, label="Cross-sectional median")
     scaling_ax.loglog(common_lags, fitted, color=SLATE_GREY, linewidth=1.5, linestyle="--", label=f"Median-slope fit H={median_h:.2f}")
-    scaling_ax.set_title("Cross-Sectional Scaling Law", fontsize=16, pad=10)
-    scaling_ax.set_xlabel("Lag (RV blocks)")
-    scaling_ax.set_ylabel(r"$\mathrm{E}\!\left[\left|\log \mathrm{RV}_{t+\Delta}-\log \mathrm{RV}_t\right|\right]$")
+    """ scaling_ax.set_title("Cross-Sectional Scaling Law", fontsize=32, pad=18) """
+    scaling_ax.set_xlabel("Lag (RV blocks)", fontsize=14)
     scaling_ax.grid(alpha=0.35)
-    scaling_ax.legend(frameon=False, loc="lower right")
-    summary = (
+    scaling_ax.legend(frameon=False, loc="upper left", fontsize =12)
+    """ summary = (
         f"{len(reports)} successful estimates\n"
         f"median H = {median_h:.2f}\n"
         f"lags used = {common_len}"
-    )
+    ) 
     scaling_ax.text(
         0.98,
         0.98,
@@ -82,13 +81,8 @@ def main(argv: list[str] | None = None) -> None:
         va="top",
         fontsize=10,
         bbox={"facecolor": "#f5f7fa", "edgecolor": LIGHT_GREY, "boxstyle": "round,pad=0.3"},
-    )
+    ) """
 
-    fig.suptitle(
-        f"Empirical Roughness Summary Across Top {args.top_n} Stocks",
-        fontsize=18,
-        y=0.99,
-    )
     fig.tight_layout()
     fig.savefig(OUTPUT_FIGURE, dpi=240)
     plt.close(fig)
