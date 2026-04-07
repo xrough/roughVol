@@ -1,3 +1,5 @@
+"""Console-based model comparison workflow."""
+
 from __future__ import annotations
 
 from roughvol.lab import HedgeBookConfig, compare_models, make_surface_dataset
@@ -43,7 +45,7 @@ def main() -> None:
 
     print(
         f"Reference model={report.reference_model_name} | "
-        f"surface_quotes={report.n_surface_quotes}"
+        f"surface_quotes={report.n_surface_quotes}",
     )
     for result in report.results:
         print(
@@ -53,7 +55,7 @@ def main() -> None:
             f"hedge_mean={result.hedge_pnl_mean:.6f} "
             f"hedge_std={result.hedge_pnl_std:.6f} "
             f"hedge_rmse={result.hedge_pnl_rmse:.6f} "
-            f"params={result.calibration.params}"
+            f"params={result.calibration.params}",
         )
 
 

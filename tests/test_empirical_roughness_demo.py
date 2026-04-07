@@ -5,7 +5,7 @@ import pytest
 
 yfinance = pytest.importorskip("yfinance")
 
-from roughvol.experiments.run_empirical_roughness_demo import (  # noqa: E402
+from roughvol.experiments.rough_estimate.run_empirical_roughness_demo import (  # noqa: E402
     DEFAULT_PRICE_HISTORY_INTERVAL,
     DEFAULT_RV_BLOCK_SIZE,
     block_label,

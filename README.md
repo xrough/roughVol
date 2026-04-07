@@ -65,102 +65,137 @@ pip install yfinance          # required for the live-data demos
 
 ## Experiments
 
+The runnable entry points are now organized by purpose under `roughvol.experiments.<purpose>`.
+
+Plotting scripts follow two rules:
+
+- each script produces exactly one figure
+- each figure is written into `output/<purpose>/...`
+
+Workflow ownership is split in two:
+
+- each purpose folder owns the simulation / calibration / data-building logic
+- `roughvol.experiments.ensemble` owns the multi-plot pipelines
+
+The older top-level scripts in `roughvol.experiments` remain as compatibility entry points.
+
+### Basics
+
+`roughvol.experiments.basics`
+
 ```bash
-# Basic vanilla pricing check
-python -m roughvol.experiments.run_vanilla
-
-# Vol surface fit + delta-hedge PnL across models
-python -m roughvol.experiments.run_model_lab
-
-# Scheme convergence study (rBergomi weak error and wall-clock time vs n_steps)
-python -m roughvol.experiments.run_rough_vol_convergence
-
-# Live calibration demo: GBM, Heston, Rough Bergomi vs real market data
-python -m roughvol.experiments.run_calibration_demo
-
-# Empirical roughness demo: realized-vol proxy, ATM IV term structure,
-# and matched rough-vs-Brownian volatility simulation from yfinance data
-python -m roughvol.experiments.run_empirical_roughness_demo
-
-# Multiple tickers are supported
-python -m roughvol.experiments.run_empirical_roughness_demo SPY AAPL MSFT
-
-# Intraday frequency is configurable and defaults to 1-minute data
-python -m roughvol.experiments.run_empirical_roughness_demo SPY NVDA --interval 5m --rv-block-size 78
+python -m roughvol.experiments.basics.run_vanilla
 ```
 
-## Calibration demo
+This is a console-only sanity check for vanilla pricing, so it does not write a figure.
 
-`run_calibration_demo` fetches live option chains from yfinance and calibrates three models against real equity options (SPY, AAPL, MSFT by default). It produces four figures:
+### Model comparison
 
-| Figure | Content |
-|---|---|
-| `calibration_demo_iv_smile.png` | Market IV smile vs calibrated model smiles per ticker |
-| `calibration_demo_rmse_bars.png` | IV RMSE bar chart (models × tickers) |
-| `calibration_demo_paths.png` | Simulated spot paths: GBM vs Rough Bergomi |
-| `calibration_demo_surface.png` | Vol surface heatmaps: market vs three models |
+`roughvol.experiments.model_comparison`
 
-### Calibration design
+```bash
+python -m roughvol.experiments.model_comparison.run_model_lab
+```
 
-- **Loss function**: IV-space MSE — `mean((σ_model − σ_market)²)` — weights all strikes equally regardless of dollar price, so OTM options carry full signal
-- **Option selection**: OTM-only surface (puts below spot, calls above spot) to avoid ITM noise; 30–90 day maturity window; stratified sampling across `(maturity, strike)` for each model
-- **Rough Bergomi scheme**: `blp-hybrid` during both optimisation and visualisation — O(n log n) with exact near-field kernel treatment for accurate short-maturity skew
-- **Optimiser**: L-BFGS-B via `scipy.optimize.minimize`
+This is also console-first: it prints surface-fit and hedge-PnL diagnostics for the model lab.
 
-### Empirical findings (SPY, April 2026)
+### Calibration
 
-| Model | IV RMSE | Calibrated params |
-|---|---|---|
-| GBM | ~7 vol pts | σ ≈ 0.22 |
-| Heston | ~4 vol pts | κ≈2, ξ≈1.5, ρ≈−0.79 |
-| Rough Bergomi | ~5 vol pts | H≈0.08, η≈2.3, ρ≈−0.98 |
+`roughvol.experiments.calibration`
 
-The recovered Hurst exponent H ≈ 0.08 is consistent with the empirical literature (Gatheral et al. 2018 found H ≈ 0.1 for S&P 500 realised volatility).
+The calibration workflow now lives in `roughvol.experiments.calibration.run_calibration_demo`.
+It fetches live data, calibrates the models, and returns structured per-ticker results for the one-plot scripts below.
 
-## Empirical roughness demo
+```bash
+python -m roughvol.experiments.calibration.run_calibration_demo
+python -m roughvol.experiments.calibration.plot_iv_smile
+python -m roughvol.experiments.calibration.plot_rmse_bars
+python -m roughvol.experiments.calibration.plot_simulated_paths
+python -m roughvol.experiments.calibration.plot_surface
+python -m roughvol.experiments.ensemble.run_calibration_pipeline
+```
 
-`run_empirical_roughness_demo` fetches historical prices and the current listed option chain from yfinance for one or more tickers (`SPY` by default). It then:
+`run_calibration_demo` is the workflow/data script.
+Each `plot_*` script writes one figure into `output/calibration/`.
+`ensemble.run_calibration_pipeline` runs the workflow once and renders the full calibration figure set.
 
-- builds non-overlapping realized-variance blocks from close-to-close returns at the chosen sampling interval
-- de-seasonalizes intraday returns by time-of-day before constructing those blocks
-- estimates the Hurst exponent from the log-log scaling of `log(realized variance)`
-- extracts one near-ATM implied-vol quote per expiry to show the current option term structure
-- simulates matched rough and Brownian lognormal volatility paths using the empirical H estimate
+Outputs:
 
-The historical-price interval is configurable with `--interval` and now defaults to `1m`. Because yfinance limits how far back intraday data can go, the script automatically picks a conservative default lookback period from the interval unless you override it with `--period`.
+- `output/calibration/calibration_demo_iv_smile.png`
+- `output/calibration/calibration_demo_rmse_bars.png`
+- `output/calibration/calibration_demo_paths.png`
+- `output/calibration/calibration_demo_surface.png`
 
-For intraday runs, the roughness estimator is session-aware: overnight close-to-open gaps are excluded from the return stream, the plot does not draw artificial lines across market closures, and the realized-variance series is built from non-overlapping `--rv-block-size` observation blocks rather than overlapping rolling windows.
+### Convergence
 
-It now saves four grouped figure files across the requested ticker set:
+`roughvol.experiments.convergence`
+
+The convergence workflow lives in `roughvol.experiments.convergence.run_rough_vol_convergence`.
+The one-plot scripts render one figure each, and the ensemble pipeline renders the standard pair.
+
+```bash
+python -m roughvol.experiments.convergence.run_rough_vol_convergence
+python -m roughvol.experiments.convergence.plot_error
+python -m roughvol.experiments.convergence.plot_timing
+python -m roughvol.experiments.ensemble.run_convergence_pipeline
+```
+
+Outputs:
+
+- `output/convergence/rough_vol_error.png`
+- `output/convergence/rough_vol_timing.png`
+
+### Rough estimate
+
+`roughvol.experiments.rough_estimate`
+
+The roughness workflow lives in `roughvol.experiments.rough_estimate.run_empirical_roughness_demo`.
+It builds per-ticker reports from yfinance-based spot and option data. Intraday history defaults to `1m`; `--period` is chosen conservatively from the interval unless you override it; and intraday roughness estimation is session-aware, excluding overnight gaps and using non-overlapping realized-variance blocks.
+
+Single-ticker and multi-ticker views:
+
+```bash
+python -m roughvol.experiments.rough_estimate.run_empirical_roughness_demo SPY AAPL MSFT
+python -m roughvol.experiments.rough_estimate.plot_realized_vol SPY AAPL MSFT
+python -m roughvol.experiments.rough_estimate.plot_roughness_regression SPY AAPL MSFT
+python -m roughvol.experiments.rough_estimate.plot_atm_term_structure SPY AAPL MSFT
+python -m roughvol.experiments.rough_estimate.plot_simulation SPY AAPL MSFT
+python -m roughvol.experiments.rough_estimate.plot_recent_window_triptych SPY AAPL
+```
+
+Cross-sectional views:
+
+```bash
+python -m roughvol.experiments.rough_estimate.plot_scaling_law --top-n 50
+python -m roughvol.experiments.rough_estimate.plot_cross_section_summary --top-n 50
+python -m roughvol.experiments.rough_estimate.plot_hurst_histogram --top-n 50
+python -m roughvol.experiments.rough_estimate.plot_hurst_rankings --top-n 50
+python -m roughvol.experiments.rough_estimate.plot_hurst_sector --top-n 100
+python -m roughvol.experiments.ensemble.run_rough_estimate_pipeline SPY AAPL --hurst-hist-top-n 50
+```
+
+Representative outputs in `output/rough_estimate/`:
 
 - `empirical_roughness_realized_vol.png`
 - `empirical_roughness_roughness_regression.png`
 - `empirical_roughness_atm_term_structure.png`
 - `empirical_roughness_simulation.png`
+- `empirical_roughness_recent_window_triptych.png`
+- `empirical_roughness_scaling_law.png`
+- `empirical_roughness_cross_section_summary.png`
+- `empirical_roughness_hurst_histogram_top50.png`
+- `empirical_roughness_hurst_rankings_top50.png`
+- `empirical_roughness_hurst_by_sector_top100.png`
+- `empirical_roughness_cache.json`
 
-Each figure contains one panel per ticker, so the outputs are split by topic rather than mixed into one per-ticker dashboard.
+The empirical roughness pipeline:
 
-The realized-volatility figure now gives each ticker a full-sample block-volatility panel and a separate high-frequency local-vol zoom over the last four hours so local roughness is easier to inspect visually.
+- de-seasonalizes intraday returns by time of day
+- builds non-overlapping realized-variance blocks
+- estimates `H` from the scaling law of `log(RV)`
+- uses the current option chain for ATM term-structure context
+- can reuse cached cross-sectional H estimates via `--cache-path` and `--refresh-cache`
 
-You can also ask for a cross-sectional Hurst histogram across a large-cap stock universe ranked by live market cap, for example:
-
-```bash
-python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 50
-python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 100
-```
-
-When enabled, the script adds a histogram figure such as `empirical_roughness_hurst_histogram_top50.png` showing the distribution of estimated Hurst exponents across the top `N` names that were successfully processed.
-
-The script also keeps a lightweight JSON cache of estimated Hurst summaries at `empirical_roughness_cache.json` by default, so repeated histogram runs can reuse prior estimates instead of recomputing every stock each time. You can override or bypass that behavior with:
-
-```bash
-python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 100 --cache-path custom_cache.json
-python -m roughvol.experiments.run_empirical_roughness_demo --hurst-hist-top-n 100 --refresh-cache
-```
-
-## Convergence experiment
-
-`run_rough_vol_convergence` runs all rBergomi schemes at increasing `n_steps` and plots:
-
-1. **Weak error vs n_steps** (log-log) — measured against a dense `exact-gaussian` reference. BLP converges to the same limit as exact at far fewer steps than midpoint.
-2. **Wall-clock time vs n_steps** — illustrates the O(n²) vs O(n log n) vs O(n³) scaling difference.
+`run_empirical_roughness_demo` is the workflow/data script.
+Each `plot_*` script writes one figure into `output/rough_estimate/`.
+`ensemble.run_rough_estimate_pipeline` runs the workflow once and renders the default empirical roughness figure set.

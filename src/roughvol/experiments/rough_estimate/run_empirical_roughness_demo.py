@@ -8,8 +8,9 @@ The script combines:
 
 Run with:
     pip install yfinance
-    python -m roughvol.experiments.run_empirical_roughness_demo
-    python -m roughvol.experiments.run_empirical_roughness_demo SPY AAPL MSFT
+    python -m roughvol.experiments.rough_estimate.run_empirical_roughness_demo
+    python -m roughvol.experiments.rough_estimate.run_empirical_roughness_demo SPY AAPL MSFT
+    python -m roughvol.experiments.rough_estimate.run_empirical_roughness_demo --hurst-hist-top-n 50
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ from roughvol.analytics.roughness import (
     simulate_lognormal_vol_paths,
 )
 from roughvol.data.yfinance_loader import get_market_data, get_price_history
+from roughvol.experiments._paths import output_path
 
 DEFAULT_TICKERS = ["SPY"]
 DEFAULT_PRICE_HISTORY_INTERVAL = "1m"
@@ -58,7 +60,7 @@ SIMULATION_VOL_OF_VOL = 1.35
 REALIZED_VOL_ZOOM_HOURS = 4
 LOCAL_VOL_WINDOW_RETURNS = 5
 CACHE_VERSION = 1
-DEFAULT_CACHE_PATH = "empirical_roughness_cache.json"
+DEFAULT_CACHE_PATH = output_path("rough_estimate", "empirical_roughness_cache.json")
 LARGE_CAP_CANDIDATE_TICKERS = [
     "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "BRK-B", "TSM", "AVGO", "TSLA",
     "JPM", "LLY", "WMT", "V", "XOM", "UNH", "ORCL", "MA", "NFLX", "COST",
@@ -75,7 +77,7 @@ LARGE_CAP_CANDIDATE_TICKERS = [
 
 
 def output_figure_name(kind: str) -> str:
-    return f"empirical_roughness_{kind}.png"
+    return output_path("rough_estimate", f"empirical_roughness_{kind}.png")
 
 
 def stable_seed_from_ticker(ticker_symbol: str) -> int:
@@ -819,7 +821,6 @@ def plot_hurst_histogram(reports: list[dict], output_path: str, *, top_n: int) -
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     tickers = [ticker.upper() for ticker in args.tickers if ticker.strip()]
-    reports: list[dict] = []
     cached_reports: dict[str, dict] = {}
     rv_block_size = args.rv_block_size_alias or args.rv_block_size
     cache_payload = load_estimate_cache(args.cache_path)
@@ -841,7 +842,6 @@ def main(argv: list[str] | None = None) -> None:
             print(f"Failed for {ticker_symbol}: {exc}")
             continue
 
-        reports.append(report)
         cached_reports[ticker_symbol] = report
         entry_key = cache_key(
             ticker_symbol,
@@ -886,27 +886,12 @@ def main(argv: list[str] | None = None) -> None:
             )
         print()
 
-    if not reports:
-        print("No per-ticker figures were generated because all requested ticker runs failed.")
-
-    output_paths: dict[str, str] = {}
-    if reports:
-        output_paths.update(
-            {
-                "realized_vol": output_figure_name("realized_vol"),
-                "roughness_regression": output_figure_name("roughness_regression"),
-                "atm_term_structure": output_figure_name("atm_term_structure"),
-                "simulation": output_figure_name("simulation"),
-            }
-        )
-        plot_realized_vol_reports(reports, output_paths["realized_vol"])
-        plot_roughness_regression_reports(reports, output_paths["roughness_regression"])
-        plot_atm_term_structure_reports(reports, output_paths["atm_term_structure"])
-        plot_simulation_reports(reports, output_paths["simulation"])
+    if not cached_reports:
+        print("No per-ticker reports were generated because all requested ticker runs failed.")
 
     if args.hurst_hist_top_n > 0:
         print("=" * 70)
-        print(f"Cross-sectional Hurst histogram for top {args.hurst_hist_top_n} stocks")
+        print(f"Cross-sectional Hurst summary for top {args.hurst_hist_top_n} stocks")
         print("=" * 70)
         cache_size_before = len(cache_entries)
         hist_reports, failures = build_hurst_histogram_reports(
@@ -919,30 +904,14 @@ def main(argv: list[str] | None = None) -> None:
             refresh_cache=args.refresh_cache,
         )
         if hist_reports:
-            hist_key = f"hurst_histogram_top{args.hurst_hist_top_n}"
-            output_paths[hist_key] = output_figure_name(hist_key)
-            plot_hurst_histogram(
-                hist_reports,
-                output_paths[hist_key],
-                top_n=args.hurst_hist_top_n,
-            )
-            print(
-                f"Histogram sample: {len(hist_reports)} successful estimates"
-                + (f", {len(failures)} failures" if failures else "")
-            )
+            print(f"Histogram sample: {len(hist_reports)} successful estimates" + (f", {len(failures)} failures" if failures else ""))
             cache_dirty = cache_dirty or (len(cache_entries) > cache_size_before)
         else:
-            print("Histogram figure was not generated because no H estimates succeeded.")
+            print("No cross-sectional H estimates succeeded.")
 
     if cache_dirty:
         save_estimate_cache(args.cache_path, cache_payload)
-
-    if output_paths:
-        print("Saved figures:")
-        for output_path in output_paths.values():
-            print(f"  {output_path}")
-        if cache_dirty:
-            print(f"Updated cache: {args.cache_path}")
+        print(f"Updated cache: {args.cache_path}")
 
 
 if __name__ == "__main__":
