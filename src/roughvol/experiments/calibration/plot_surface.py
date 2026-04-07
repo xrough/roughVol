@@ -51,7 +51,7 @@ def plot_vol_surface(
                 market_grid[i, j] = sub["implied_vol"].mean()
 
     model_grids: dict[str, np.ndarray] = {}
-    for model_name in ("GBM", "Heston", "RoughBergomi"):
+    for model_name in ("GBM", "Heston", "RoughBergomi", "RoughHeston"):
         calib_result = report.results.get(model_name)
         if calib_result is None:
             model_grids[model_name] = np.full((n_mon, n_mat), np.nan)
@@ -83,15 +83,16 @@ def plot_vol_surface(
 
     mat_labels = [f"{maturity:.2f}" for maturity in maturities]
     mon_labels = [f"{int(moneyness * 100)}%" for moneyness in moneyness_grid]
-    titles = ["Market", "GBM", "Heston", "Rough Bergomi"]
+    titles = ["Market", "GBM", "Heston", "Rough Bergomi", "Rough Heston"]
     grids = [
         market_grid,
         model_grids["GBM"],
         model_grids["Heston"],
         model_grids["RoughBergomi"],
+        model_grids.get("RoughHeston", np.full((n_mon, n_mat), np.nan)),
     ]
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig, axes = plt.subplots(2, 3, figsize=(21, 10))
     axes_flat = axes.flatten()
 
     image = None
@@ -119,8 +120,11 @@ def plot_vol_surface(
                 if not np.isnan(value):
                     ax.text(j, i, f"{value:.2%}", ha="center", va="center", fontsize=6.5, color="black")
 
+    for ax in axes_flat[len(titles):]:
+        ax.set_visible(False)
+
     if image is not None:
-        cbar = fig.colorbar(image, ax=axes_flat, orientation="vertical", fraction=0.02, pad=0.04)
+        cbar = fig.colorbar(image, ax=axes_flat[:len(titles)], orientation="vertical", fraction=0.02, pad=0.04)
         cbar.set_label("Implied Volatility", fontsize=9)
         cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
 

@@ -68,7 +68,7 @@ def plot_iv_smiles(
         fine_moneyness = np.linspace(0.80, 1.20, 10)
         fine_strikes = (fine_moneyness * spot).tolist()
 
-        for model_name in ("GBM", "Heston", "RoughBergomi"):
+        for model_name in ("GBM", "Heston", "RoughBergomi", "RoughHeston"):
             calib_result = report.results.get(model_name)
             if calib_result is None:
                 continue

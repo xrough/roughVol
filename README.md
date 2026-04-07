@@ -13,7 +13,7 @@ Rough volatility path simulation, live market calibration, and model comparison.
 | GBM | exact log-Euler | yes |
 | Heston | Euler full-truncation | yes |
 | Rough Bergomi | `volterra-midpoint` · `blp-hybrid` · `exact-gaussian` | yes |
-| Rough Heston | `volterra-euler` · `markovian-lift` | — |
+| Rough Heston | `volterra-euler` · `markovian-lift` · `bayer-breneis` | yes |
 
 All models implement the `PathModel` protocol and run through the unified `MonteCarloEngine`.
 
@@ -33,8 +33,11 @@ Select with `RoughBergomiModel(..., scheme="blp-hybrid")`.
 |---|---|---|
 | `volterra-euler` | O(n²) | Direct Volterra history accumulation; positivity by clipping |
 | `markovian-lift` | O(N·n) | N-factor sum-of-exponentials kernel; exponential integrator for stability |
+| `bayer-breneis` | O(N·n) | Order-2 weak scheme: 3-point Gauss-Hermite innovation for dW₂ + Strang splitting for log-spot; arXiv:2310.04146 |
 
-Select with `RoughHestonModel(..., scheme="markovian-lift", n_factors=8)`.
+Select with `RoughHestonModel(..., scheme="bayer-breneis", n_factors=8)`.
+
+The `bayer-breneis` scheme replaces the Gaussian variance driver with z ∈ {−√3, 0, +√3}, P = {1/6, 2/3, 1/6} (matching 5 moments of N(0,1)) and uses Strang splitting for log-spot to symmetrise the Itô correction across V_i and V_{i+1}.
 
 ## Instruments
 
@@ -44,7 +47,7 @@ Select with `RoughHestonModel(..., scheme="markovian-lift", n_factors=8)`.
 
 | Package | Purpose |
 |---|---|
-| `roughvol.models` | GBM, Heston, Rough Bergomi (3 schemes), Rough Heston (2 schemes) |
+| `roughvol.models` | GBM, Heston, Rough Bergomi (3 schemes), Rough Heston (3 schemes) |
 | `roughvol.kernels` | Pure math: Volterra midpoint weights, exact Cholesky, Rough Heston kernel, Markovian lift fit |
 | `roughvol.sim` | Brownian motion primitives and fBM / Volterra driver simulation |
 | `roughvol.engines` | Monte Carlo pricing engine |
@@ -137,6 +140,8 @@ The one-plot scripts render one figure each, and the ensemble pipeline renders t
 python -m roughvol.experiments.convergence.run_rough_vol_convergence
 python -m roughvol.experiments.convergence.plot_error
 python -m roughvol.experiments.convergence.plot_timing
+python -m roughvol.experiments.convergence.plot_error_rh
+python -m roughvol.experiments.convergence.plot_timing_rh
 python -m roughvol.experiments.ensemble.run_convergence_pipeline
 ```
 
@@ -144,6 +149,8 @@ Outputs:
 
 - `output/convergence/rough_vol_error.png`
 - `output/convergence/rough_vol_timing.png`
+- `output/convergence/rough_heston_error.png`
+- `output/convergence/rough_heston_timing.png`
 
 ### Rough estimate
 

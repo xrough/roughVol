@@ -28,6 +28,13 @@ N_STEPS_BENCH = 32
 TEST_STEPS = [8, 16, 32, 64]
 TEST_STEPS_EXACT = [8, 16, 32]
 
+# Rough Heston uses lower path counts for a quick first-pass run.
+# volterra-euler is O(n_paths × n_steps²), so high step counts are expensive.
+# Raise these back to N_PATHS_BENCH / N_PATHS_TEST once the scheme is validated.
+N_PATHS_BENCH_RH = 20_000
+N_PATHS_TEST_RH = 50_000
+TEST_STEPS_RH = [4, 8, 16, 32]
+
 
 def price(model: object, n_steps: int, n_paths: int, seed: int) -> tuple[float, float, float]:
     engine = MonteCarloEngine(n_paths=n_paths, n_steps=n_steps, seed=seed, antithetic=True)
@@ -83,8 +90,8 @@ def run_rough_heston_convergence() -> dict:
     print("=" * 60)
 
     bench_model = RoughHestonModel(**RH_PARAMS, scheme="markovian-lift", n_factors=8)
-    bench_engine = MonteCarloEngine(n_paths=N_PATHS_BENCH, n_steps=128, seed=0, antithetic=True)
-    print(f"  Computing benchmark: n_steps=128, n_paths={N_PATHS_BENCH} ...", end=" ")
+    bench_engine = MonteCarloEngine(n_paths=N_PATHS_BENCH_RH, n_steps=64, seed=0, antithetic=True)
+    print(f"  Computing benchmark: n_steps=64, n_paths={N_PATHS_BENCH_RH} ...", end=" ")
     started = time.perf_counter()
     bench_result = bench_engine.price(model=bench_model, instrument=INSTRUMENT, market=MARKET_RH)
     bench_elapsed = time.perf_counter() - started
@@ -95,9 +102,9 @@ def run_rough_heston_convergence() -> dict:
     for scheme, n_factors in [("volterra-euler", 8), ("markovian-lift", 8), ("bayer-breneis", 8)]:
         print(f"\n  Scheme: {scheme}")
         prices, errors, times, ns = [], [], [], []
-        for n_steps in TEST_STEPS:
+        for n_steps in TEST_STEPS_RH:
             model = RoughHestonModel(**RH_PARAMS, scheme=scheme, n_factors=n_factors)
-            engine = MonteCarloEngine(n_paths=N_PATHS_TEST, n_steps=n_steps, seed=42, antithetic=True)
+            engine = MonteCarloEngine(n_paths=N_PATHS_TEST_RH, n_steps=n_steps, seed=42, antithetic=True)
             started = time.perf_counter()
             result = engine.price(model=model, instrument=INSTRUMENT, market=MARKET_RH)
             elapsed = time.perf_counter() - started
@@ -179,7 +186,7 @@ def plot_error_panel_rh(rh_results: dict, out: str | None = None) -> None:
         "bayer-breneis":   ("C2", "s:",  "Bayer-Breneis (order-2 weak)"),
     }
 
-    steps_all = np.array(TEST_STEPS, dtype=float)
+    steps_all = np.array(TEST_STEPS_RH, dtype=float)
     n_ref = np.array([steps_all[0], steps_all[-1]], dtype=float)
 
     for scheme, data in rh_results["schemes"].items():

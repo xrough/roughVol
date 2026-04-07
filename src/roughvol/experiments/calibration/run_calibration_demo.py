@@ -31,6 +31,7 @@ from roughvol.calibration.calibration import (
     make_gbm_calibrator,
     make_heston_calibrator,
     make_rough_bergomi_calibrator,
+    make_rough_heston_calibrator,
 )
 from roughvol.data.yfinance_loader import get_market_data, get_option_surface
 from roughvol.engines.mc import MonteCarloEngine
@@ -38,6 +39,7 @@ from roughvol.instruments.vanilla import VanillaOption
 from roughvol.models.GBM_model import GBM_Model
 from roughvol.models.heston_model import HestonModel
 from roughvol.models.rough_bergomi_model import RoughBergomiModel
+from roughvol.models.rough_heston_model import RoughHestonModel
 from roughvol.experiments._paths import output_path
 from roughvol.types import MarketData
 
@@ -66,6 +68,13 @@ CALIB_ENGINE_RB = {
     "antithetic": True,
 }
 
+CALIB_ENGINE_RH = {
+    "n_paths": 2_000,
+    "n_steps": 20,
+    "seed": 42,
+    "antithetic": True,
+}
+
 VIZ_ENGINE = {
     "n_paths": 300,
     "n_steps": 16,
@@ -77,18 +86,21 @@ MODEL_COLOURS = {
     "GBM": "steelblue",
     "Heston": "darkorange",
     "RoughBergomi": "crimson",
+    "RoughHeston": "mediumpurple",
 }
 
 MODEL_LINESTYLES = {
     "GBM": "--",
     "Heston": ":",
     "RoughBergomi": "-.",
+    "RoughHeston": (0, (3, 1, 1, 1)),  # dash-dot-dot
 }
 
 MODEL_LABELS = {
     "GBM": "GBM",
     "Heston": "Heston",
     "RoughBergomi": "Rough Bergomi",
+    "RoughHeston": "Rough Heston",
 }
 
 
@@ -308,6 +320,16 @@ def build_model_from_params(model_name: str, params: dict[str, float]) -> object
             xi0=params["xi0"],
             scheme="blp-hybrid",
         )
+    if model_name == "RoughHeston":
+        return RoughHestonModel(
+            hurst=params["hurst"],
+            lam=params["lam"],
+            theta=params["theta"],
+            nu=params["nu"],
+            rho=params["rho"],
+            v0=params["v0"],
+            scheme="volterra-euler",  # default; swap to bayer-breneis for accuracy runs
+        )
     raise ValueError(f"Unknown model: {model_name}")
 
 
@@ -401,6 +423,7 @@ def calibrate_ticker(
     opts_df_gbm = _stratified_sample(calib_df[base_cols], n=10)
     opts_df_heston = _stratified_sample(calib_df[base_cols], n=14)
     opts_df_rb = _stratified_sample(calib_df[base_cols], n=14)
+    opts_df_rh = _stratified_sample(calib_df[base_cols], n=12)
 
     results: dict[str, CalibResult | None] = {}
     iv_rmse: dict[str, float] = {}
@@ -416,6 +439,15 @@ def calibrate_ticker(
                 scheme="blp-hybrid",
             ),
             opts_df_rb,
+        ),
+        (
+            "RoughHeston",
+            make_rough_heston_calibrator(
+                x0_sigma=atm_iv,
+                engine_kwargs=CALIB_ENGINE_RH,
+                scheme="volterra-euler",  # simplest default; swap to bayer-breneis for accuracy
+            ),
+            opts_df_rh,
         ),
     ]
 
@@ -475,13 +507,14 @@ def print_calibration_summary(all_results: dict[str, TickerCalibrationReport]) -
     print("\n" + "=" * 60)
     print("  Calibration Summary  (IV RMSE in vol units)")
     print("=" * 60)
-    print(f"  {'Ticker':<8} {'GBM RMSE':>10} {'Heston RMSE':>12} {'rBergomi RMSE':>14}")
-    print(f"  {'─' * 48}")
+    print(f"  {'Ticker':<8} {'GBM RMSE':>10} {'Heston RMSE':>12} {'rBergomi RMSE':>14} {'rHeston RMSE':>13}")
+    print(f"  {'─' * 62}")
     for ticker_symbol, report in all_results.items():
-        g = f"{report.iv_rmse.get('GBM', float('nan')):.4f}"
-        h = f"{report.iv_rmse.get('Heston', float('nan')):.4f}"
-        rb = f"{report.iv_rmse.get('RoughBergomi', float('nan')):.4f}"
-        print(f"  {ticker_symbol:<8} {g:>10} {h:>12} {rb:>14}")
+        g  = f"{report.iv_rmse.get('GBM',          float('nan')):.4f}"
+        h  = f"{report.iv_rmse.get('Heston',        float('nan')):.4f}"
+        rb = f"{report.iv_rmse.get('RoughBergomi',  float('nan')):.4f}"
+        rh = f"{report.iv_rmse.get('RoughHeston',   float('nan')):.4f}"
+        print(f"  {ticker_symbol:<8} {g:>10} {h:>12} {rb:>14} {rh:>13}")
 
 
 def collect_calibration_results(

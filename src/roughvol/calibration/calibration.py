@@ -346,6 +346,60 @@ def make_rough_bergomi_calibrator(
     )
 
 
+def make_rough_heston_calibrator(
+    x0_sigma: float = 0.20,
+    x0: list[float] | None = None,
+    engine_kwargs: dict | None = None,
+    scheme: str = "volterra-euler",
+    n_factors: int = 8,
+) -> MCCalibrator:
+    """MCCalibrator for RoughHestonModel (6 params: hurst, lam, theta, nu, rho, v0).
+
+    Parameters
+    ----------
+    scheme : simulation scheme used during optimisation.
+        "volterra-euler"  — O(n²), direct Volterra history; simplest, default.
+        "markovian-lift"  — O(N·n), N-factor exponential integrator; faster.
+        "bayer-breneis"   — O(N·n), order-2 weak scheme; most accurate.
+    n_factors : number of Markovian lift factors; ignored for "volterra-euler".
+    """
+    from roughvol.models.rough_heston_model import RoughHestonModel
+
+    v0_guess = x0_sigma ** 2
+    default_x0 = [0.1, 1.0, v0_guess, 0.3, -0.5, v0_guess]
+    raw_x0 = list(x0) if x0 else default_x0
+    if len(raw_x0) != 6:
+        raise ValueError("rough Heston warm start x0 must have six values")
+
+    _scheme = scheme
+    _n_factors = n_factors
+
+    return MCCalibrator(
+        model_name="RoughHeston",
+        model_factory=lambda x: RoughHestonModel(
+            hurst=float(x[0]),
+            lam=float(x[1]),
+            theta=float(x[2]),
+            nu=float(x[3]),
+            rho=float(x[4]),
+            v0=float(x[5]),
+            scheme=_scheme,
+            n_factors=_n_factors,
+        ),
+        param_names=["hurst", "lam", "theta", "nu", "rho", "v0"],
+        bounds=[
+            (1e-2, 0.499),  # hurst
+            (1e-2, 10.0),   # lam  (mean-reversion speed)
+            (1e-4, 1.0),    # theta (long-run variance)
+            (1e-2, 2.0),    # nu   (vol-of-vol)
+            (-0.99, 0.99),  # rho
+            (1e-4, 1.0),    # v0   (initial variance)
+        ],
+        x0=raw_x0,
+        engine_kwargs=engine_kwargs or {"n_paths": 2_000, "n_steps": 20, "seed": 42, "antithetic": True},
+    )
+
+
 # ── Helper ─────────────────────────────────────────────────────────────────
 
 def _compute_bs_mse(

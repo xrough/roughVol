@@ -23,10 +23,10 @@ def plot_rmse_bars(
     if not reports:
         return
 
-    model_names = ["GBM", "Heston", "RoughBergomi"]
+    model_names = ["GBM", "Heston", "RoughBergomi", "RoughHeston"]
     tickers = [report.ticker for report in reports]
     x = np.arange(len(tickers))
-    width = 0.25
+    width = 0.20
 
     fig, ax = plt.subplots(figsize=(max(6, 2.2 * len(tickers)), 5))
 
@@ -48,7 +48,7 @@ def plot_rmse_bars(
             padding=2,
         )
 
-    ax.set_xticks(x + width)
+    ax.set_xticks(x + width * 1.5)
     ax.set_xticklabels(tickers, fontsize=11)
     ax.set_ylabel("IV RMSE (vol ppts)", fontsize=10)
     ax.set_title("Calibration Quality: IV RMSE per Model and Ticker", fontsize=12)
