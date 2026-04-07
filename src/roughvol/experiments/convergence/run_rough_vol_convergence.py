@@ -92,7 +92,7 @@ def run_rough_heston_convergence() -> dict:
     print(f"price={ref_price:.5f}  ({bench_elapsed:.1f}s)")
 
     results = {"ref_price": ref_price, "schemes": {}}
-    for scheme, n_factors in [("volterra-euler", 8), ("markovian-lift", 8)]:
+    for scheme, n_factors in [("volterra-euler", 8), ("markovian-lift", 8), ("bayer-breneis", 8)]:
         print(f"\n  Scheme: {scheme}")
         prices, errors, times, ns = [], [], [], []
         for n_steps in TEST_STEPS:
@@ -170,8 +170,76 @@ def plot_timing_panel(rb_results: dict, out: str | None = None) -> None:
     print(f"Saved: {out}")
 
 
+def plot_error_panel_rh(rh_results: dict, out: str | None = None) -> None:
+    """Log-log error plot for the three Rough Heston schemes."""
+    fig, ax = plt.subplots(figsize=(6.2, 5.0))
+    style_map = {
+        "volterra-euler":  ("C0", "o-",  "Volterra Euler (O(n²))"),
+        "markovian-lift":  ("C3", "D--", "Markovian lift (O(N·n))"),
+        "bayer-breneis":   ("C2", "s:",  "Bayer-Breneis (order-2 weak)"),
+    }
+
+    steps_all = np.array(TEST_STEPS, dtype=float)
+    n_ref = np.array([steps_all[0], steps_all[-1]], dtype=float)
+
+    for scheme, data in rh_results["schemes"].items():
+        color, fmt, label = style_map[scheme]
+        scheme_steps = np.array(data["steps"], dtype=float)
+        errors = np.maximum(np.array(data["errors"]), 1e-7)
+        ax.loglog(scheme_steps, errors, fmt, color=color, label=label, linewidth=1.8, markersize=7)
+
+    # Order-1 reference line anchored on volterra-euler
+    if "volterra-euler" in rh_results["schemes"]:
+        ve_errors = rh_results["schemes"]["volterra-euler"]["errors"]
+        anchor = max(ve_errors[0], 1e-7)
+        ax.loglog(n_ref, anchor * (n_ref / n_ref[0]) ** (-1.0), "k:", linewidth=1, label="O(n⁻¹) guide")
+
+    # Order-2 reference line anchored on bayer-breneis
+    if "bayer-breneis" in rh_results["schemes"]:
+        bb_errors = rh_results["schemes"]["bayer-breneis"]["errors"]
+        anchor2 = max(bb_errors[0], 1e-7)
+        ax.loglog(n_ref, anchor2 * (n_ref / n_ref[0]) ** (-2.0), "k--", linewidth=1, label="O(n⁻²) guide")
+
+    ax.set_title("Rough Heston price error vs n_steps")
+    ax.set_xlabel("n_steps")
+    ax.set_ylabel("Absolute pricing error")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    out = out or output_path("convergence", "rough_heston_error.png")
+    fig.savefig(out, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+def plot_timing_panel_rh(rh_results: dict, out: str | None = None) -> None:
+    """Wall-clock timing plot for the three Rough Heston schemes."""
+    fig, ax = plt.subplots(figsize=(6.2, 5.0))
+    style_map = {
+        "volterra-euler":  ("C0", "o-",  "Volterra Euler"),
+        "markovian-lift":  ("C3", "D--", "Markovian lift"),
+        "bayer-breneis":   ("C2", "s:",  "Bayer-Breneis"),
+    }
+
+    for scheme, data in rh_results["schemes"].items():
+        color, fmt, label = style_map[scheme]
+        ax.loglog(data["steps"], data["times"], fmt, color=color, label=label, linewidth=1.8, markersize=7)
+
+    ax.set_title("Rough Heston wall-clock time vs n_steps")
+    ax.set_xlabel("n_steps")
+    ax.set_ylabel("Wall-clock time (s)")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    out = out or output_path("convergence", "rough_heston_timing.png")
+    fig.savefig(out, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
 def main() -> None:
     run_rough_bergomi_convergence()
+    run_rough_heston_convergence()
 
 
 if __name__ == "__main__":
