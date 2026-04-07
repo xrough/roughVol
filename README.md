@@ -1,6 +1,6 @@
 # Rough Pricing
 
-A self-contained Python research lab for **derivative pricing and calibration under stochastic and rough volatility models**. The project is intentionally experimental: just the simulation, analytics, calibration, and experiment scripts needed to study roughness empirically. Thanks to @Effective-Alpha for togther reviewing the rough volatility models. 
+A self-contained Python research lab for **derivative pricing and calibration under stochastic and rough volatility models**. The project is intentionally experimental: just the simulation, analytics, calibration, and experiment scripts needed to study roughness empirically. Thanks to [@Effective-Alpha](https://github.com/Effective-Alpha) for togther reviewing the rough volatility models. 
 
 ## Core focus
 
