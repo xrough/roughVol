@@ -54,8 +54,7 @@ The `bayer-breneis` scheme replaces the Gaussian variance driver with z ∈ {−
 | `roughvol.analytics` | Black-Scholes closed-form pricing, implied vol, delta |
 | `roughvol.calibration` | IV-space MC calibration (L-BFGS-B) and windowed calibration toolbox |
 | `roughvol.data` | Live market data loader via yfinance (spot, rates, OTM option surface) |
-| `roughvol.lab` | Model comparison: vol surface fit and delta-hedge PnL |
-| `roughvol.experiments` | Runnable scripts |
+| `roughvol.experiments` | Runnable scripts (calibration, convergence, model comparison, rough estimate) |
 
 ## Setup
 

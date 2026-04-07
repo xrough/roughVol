@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from roughvol.lab import HedgeBookConfig, compare_models, make_surface_dataset
+from roughvol.experiments.model_comparison.model_comparison import HedgeBookConfig, compare_models, make_surface_dataset
 from roughvol.types import MarketData
 
 
