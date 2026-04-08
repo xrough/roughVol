@@ -70,7 +70,7 @@ CALIB_ENGINE_RB = {
 
 CALIB_ENGINE_RH = {
     "n_paths": 2_000,
-    "n_steps": 20,
+    "n_steps": 52,
     "seed": 42,
     "antithetic": True,
 }
@@ -328,7 +328,7 @@ def build_model_from_params(model_name: str, params: dict[str, float]) -> object
             nu=params["nu"],
             rho=params["rho"],
             v0=params["v0"],
-            scheme="volterra-euler",  # default; swap to bayer-breneis for accuracy runs
+            scheme="markovian-lift",
         )
     raise ValueError(f"Unknown model: {model_name}")
 
@@ -445,7 +445,7 @@ def calibrate_ticker(
             make_rough_heston_calibrator(
                 x0_sigma=atm_iv,
                 engine_kwargs=CALIB_ENGINE_RH,
-                scheme="volterra-euler",  # simplest default; swap to bayer-breneis for accuracy
+                scheme="markovian-lift",
             ),
             opts_df_rh,
         ),

@@ -1,0 +1,11 @@
+{
+  "key": "32fdeabd5d8f64eb",
+  "price": 9.31522012874804,
+  "p1": 0.7906971899425992,
+  "p2": 0.7333088849950681,
+  "integration_error": 1.6053753927625588e-07,
+  "martingale_error": 1.3517783152404858e-16,
+  "stability_error": 0.000669504754517547,
+  "riccati_steps": 1200,
+  "integration_limit": 60.0
+}

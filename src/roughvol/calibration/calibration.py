@@ -350,7 +350,7 @@ def make_rough_heston_calibrator(
     x0_sigma: float = 0.20,
     x0: list[float] | None = None,
     engine_kwargs: dict | None = None,
-    scheme: str = "volterra-euler",
+    scheme: str = "markovian-lift",
     n_factors: int = 8,
 ) -> MCCalibrator:
     """MCCalibrator for RoughHestonModel (6 params: hurst, lam, theta, nu, rho, v0).
@@ -358,9 +358,11 @@ def make_rough_heston_calibrator(
     Parameters
     ----------
     scheme : simulation scheme used during optimisation.
-        "volterra-euler"  — O(n²), direct Volterra history; simplest, default.
-        "markovian-lift"  — O(N·n), N-factor exponential integrator; faster.
-        "bayer-breneis"   — O(N·n), order-2 weak scheme; most accurate.
+        "markovian-lift"  — O(N·n), N-factor exponential integrator; converges to
+                            the correct price; default.
+        "volterra-euler"  — O(n²), direct Volterra history; correct but slow.
+        "bayer-breneis"   — NOTE: current implementation has asymptotic bias;
+                            do not use for calibration until corrected.
     n_factors : number of Markovian lift factors; ignored for "volterra-euler".
     """
     from roughvol.models.rough_heston_model import RoughHestonModel
@@ -396,7 +398,7 @@ def make_rough_heston_calibrator(
             (1e-4, 1.0),    # v0   (initial variance)
         ],
         x0=raw_x0,
-        engine_kwargs=engine_kwargs or {"n_paths": 2_000, "n_steps": 20, "seed": 42, "antithetic": True},
+        engine_kwargs=engine_kwargs or {"n_paths": 2_000, "n_steps": 52, "seed": 42, "antithetic": True},
     )
 
 

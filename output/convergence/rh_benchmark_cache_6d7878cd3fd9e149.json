@@ -1,0 +1,11 @@
+{
+  "key": "6d7878cd3fd9e149",
+  "price": 9.342697554406138,
+  "p1": 0.7903871395587792,
+  "p2": 0.7326940757541661,
+  "integration_error": 3.265241335059484e-07,
+  "martingale_error": 1.3517783152404858e-16,
+  "stability_error": 0.0012161003457062947,
+  "riccati_steps": 600,
+  "integration_limit": 150.0
+}

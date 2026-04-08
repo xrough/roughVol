@@ -132,15 +132,16 @@ Outputs:
 
 `roughvol.experiments.convergence`
 
-The convergence workflow lives in `roughvol.experiments.convergence.run_rough_vol_convergence`.
+The convergence workflow lives in `roughvol.experiments.convergence.run_rough_vol`.
 The one-plot scripts render one figure each, and the ensemble pipeline renders the standard pair.
 
 ```bash
-python -m roughvol.experiments.convergence.run_rough_vol_convergence
+python -m roughvol.experiments.convergence.run_rough_vol
 python -m roughvol.experiments.convergence.plot_error
 python -m roughvol.experiments.convergence.plot_timing
 python -m roughvol.experiments.convergence.plot_error_rh
 python -m roughvol.experiments.convergence.plot_timing_rh
+python -m roughvol.experiments.convergence.plot_efficiency_rh
 python -m roughvol.experiments.ensemble.run_convergence_pipeline
 ```
 
@@ -150,6 +151,31 @@ Outputs:
 - `output/convergence/rough_vol_timing.png`
 - `output/convergence/rough_heston_error.png`
 - `output/convergence/rough_heston_timing.png`
+- `output/convergence/rough_heston_efficiency.png`
+
+#### Scheme efficiency: accuracy vs wall-clock time
+
+![Rough Heston efficiency](output/convergence/rough_heston_efficiency.png)
+
+Each panel fixes the Hurst exponent H and plots wall-clock time (log scale) against absolute
+pricing error relative to the characteristic-function benchmark, for N = 32 factors and a
+Heston control variate. Points toward the **lower right** are better — lower error achieved
+in less time. Each curve is one simulation scheme; the labels show the number of time steps
+at each point.
+
+**H = 0.1** (mildly rough): Volterra Euler dominates. Its exact kernel accumulation incurs no
+Markovian approximation error, so it reaches sub-0.06 error at n = 256 steps in ~15 s — below
+the factor floor that limits the Markovian-lift schemes even at n = 1024.
+
+**H = 0.01** (extremely rough): the picture inverts. The kernel K(t) ~ t^{-0.49} is nearly
+maximally singular; Volterra Euler stalls above 0.3 error at any tested step count because the
+O(n²) cost makes a fine enough grid prohibitive. The Markovian lift and Bayer-Breneis schemes,
+whose N = 32 exponential basis captures the singularity, converge monotonically and reach
+comparable error 3× faster.
+
+**H = 0.05** (transition regime): both families are competitive. This is the roughness range
+most commonly calibrated to short-dated equity options (7–30 day expiries), where the choice
+of scheme is a genuine engineering decision.
 
 ### Rough estimate
 

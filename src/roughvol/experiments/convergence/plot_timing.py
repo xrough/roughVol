@@ -1,9 +1,45 @@
-from roughvol.experiments.convergence._common import build_results
-from roughvol.experiments.convergence.run_rough_vol_convergence import plot_timing_panel
+"""Plot: rBergomi wall-clock time vs n_steps.
+
+Run:
+    python -m roughvol.experiments.convergence.plot_timing
+"""
+
+from __future__ import annotations
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from roughvol.experiments._paths import output_path
+from roughvol.experiments.convergence.run_rough_vol import run_rough_bergomi_convergence
+
+
+def plot_timing_panel(rb_results: dict, out: str | None = None) -> None:
+    fig, ax = plt.subplots(figsize=(6.2, 5.0))
+    style_map = {
+        "volterra-midpoint": ("C0", "o-",  "Volterra midpoint"),
+        "blp-hybrid":        ("C1", "s--", "BLP hybrid"),
+        "exact-gaussian":    ("C2", "^:",  "Exact Gaussian"),
+    }
+    for scheme, data in rb_results["schemes"].items():
+        color, fmt, label = style_map[scheme]
+        ax.loglog(data["steps"], data["times"], fmt, color=color, label=label, linewidth=1.8, markersize=7)
+
+    ax.set_title("rBergomi wall-clock time vs n_steps")
+    ax.set_xlabel("n_steps")
+    ax.set_ylabel("Wall-clock time (s)")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    out = out or output_path("convergence", "rough_vol_timing.png")
+    fig.savefig(out, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
 
 
 def main() -> None:
-    plot_timing_panel(build_results())
+    plot_timing_panel(run_rough_bergomi_convergence())
 
 
 if __name__ == "__main__":
