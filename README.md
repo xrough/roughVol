@@ -51,6 +51,8 @@ The rough models' theoretical edge is in the **ATM skew term structure**, which 
 
 Static single-maturity calibration is therefore the wrong test. The meaningful benchmark is **multi-maturity joint calibration across the 7–60 day range**, which is the next step.
 
+![Short-term calibration panel](output/calibration/short_term_calibration_panel.png)
+
 ### Empirical roughness
 
 The roughness estimation pipeline fits H from the scaling law of realized variance across non-overlapping blocks, using intraday 1-minute data with session-aware gap exclusion. A key open question is whether the empirically estimated H agrees with the H calibrated from the option surface — they often diverge, and that tension is practically important for model selection.
