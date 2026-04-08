@@ -5,9 +5,11 @@ import json
 import pandas as pd
 
 from roughvol.calibration.calibration import CalibResult, make_rough_heston_calibrator
+from roughvol.data.yfinance_loader import select_otm_option_side
 from roughvol.experiments.calibration._short_term_panel import render_short_term_panel
 from roughvol.experiments.calibration.animate_short_term_panel import build_animation
 from roughvol.experiments.calibration.run_short_term_calibration_demo import (
+    compute_model_iv_smile,
     DEFAULT_CACHE_PATH,
     MODEL_NAMES,
     ShortTermSnapshot,
@@ -239,3 +241,58 @@ def test_rough_heston_calibrator_factory_exists():
 def test_default_cache_path_targets_calibration_output():
     assert DEFAULT_CACHE_PATH.endswith("output/calibration/short_term_calibration_cache.json")
     assert resolve_snapshot_date("2026-04-07") == "2026-04-07"
+
+
+def test_select_otm_option_side_uses_forward_boundary():
+    assert not select_otm_option_side(
+        strike=100.0,
+        spot=100.0,
+        maturity=30 / 365.25,
+        rate=0.05,
+        div=0.0,
+        atm_band=0.0,
+    )
+    assert select_otm_option_side(
+        strike=100.0,
+        spot=100.0,
+        maturity=30 / 365.25,
+        rate=0.0,
+        div=0.05,
+        atm_band=0.0,
+    )
+
+
+def test_compute_model_iv_smile_uses_otm_option_side(monkeypatch):
+    seen_sides: list[bool] = []
+
+    class _DummyPriceResult:
+        def __init__(self, price: float) -> None:
+            self.price = price
+
+    def fake_price(self, *, model, instrument, market):
+        seen_sides.append(bool(instrument.is_call))
+        return _DummyPriceResult(price=1.0)
+
+    monkeypatch.setattr(
+        "roughvol.experiments.calibration.run_short_term_calibration_demo.MonteCarloEngine.price",
+        fake_price,
+    )
+    monkeypatch.setattr(
+        "roughvol.experiments.calibration.run_short_term_calibration_demo.implied_vol",
+        lambda **kwargs: 0.2,
+    )
+
+    market = MarketData(spot=100.0, rate=0.0, div_yield=0.0)
+    strikes = [80.0, 90.0, 100.0, 110.0, 120.0]
+
+    smile = compute_model_iv_smile(
+        model_name="GBM",
+        params={"sigma": 0.2},
+        market_data=market,
+        maturity=30 / 365.25,
+        strikes=strikes,
+        engine_kwargs={"n_paths": 1, "n_steps": 1, "seed": 1, "antithetic": False},
+    )
+
+    assert smile == [0.2] * len(strikes)
+    assert seen_sides == [False, False, True, True, True]

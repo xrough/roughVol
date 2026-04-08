@@ -10,6 +10,57 @@ from roughvol.types import MarketData, PathBundle, SimConfig
 
 _VALID_SCHEMES = ("volterra-midpoint", "exact-gaussian", "blp-hybrid")
 
+# ---------------------------------------------------------------------------
+# Optional JAX backend for the spot path time loop
+# ---------------------------------------------------------------------------
+try:
+    import jax
+    import jax.numpy as jnp
+
+    jax.config.update("jax_enable_x64", True)
+
+    @jax.jit
+    def _jax_var_and_spot(Y, xi_curve, t, dt, dW_s, H, eta, S0, r, q):
+        """JAX lax.scan kernel — variance and spot paths.
+
+        All array inputs should be JAX arrays.  H, eta, S0, r, q are scalars.
+        Returns var (n_paths, n_times) and S (n_paths, n_times) as JAX arrays.
+        """
+        n_paths = Y.shape[0]
+
+        # Variance is fully vectorised — no sequential dependence.
+        variance_correction = jnp.power(t[1:], 2.0 * H)
+        var_rest = xi_curve[1:][None, :] * jnp.exp(
+            eta * Y[:, 1:] - 0.5 * (eta ** 2) * variance_correction[None, :]
+        )
+        var0 = jnp.full((n_paths, 1), xi_curve[0])
+        var = jnp.concatenate([var0, var_rest], axis=1)  # (n_paths, n_times)
+
+        # Spot path via lax.scan — replaces the Python for-loop over time steps.
+        log_S0_vec = jnp.full(n_paths, jnp.log(S0))
+
+        def step(log_S, xs):
+            v_j, dW_s_j, dt_j = xs
+            v = jnp.maximum(v_j, 0.0)
+            log_S_new = log_S + (r - q - 0.5 * v) * dt_j + jnp.sqrt(v) * dW_s_j
+            return log_S_new, log_S_new
+
+        # Scan over (n_steps,) leading axis; each slice is (n_paths,) or scalar.
+        _, log_S_steps = jax.lax.scan(
+            step, log_S0_vec,
+            (var[:, :-1].T, dW_s.T, dt),  # shapes: (n_steps, n_paths), (n_steps, n_paths), (n_steps,)
+        )
+        # log_S_steps: (n_steps, n_paths)
+        log_S_all = jnp.concatenate([log_S0_vec[None, :], log_S_steps], axis=0)  # (n_times, n_paths)
+        S = jnp.exp(log_S_all).T  # (n_paths, n_times)
+
+        return var, S
+
+    _JAX_AVAILABLE = True
+
+except ImportError:
+    _JAX_AVAILABLE = False
+
 
 @dataclass(frozen=True)
 class RoughBergomiModel:
@@ -235,7 +286,20 @@ def _var_and_spot(
     n_steps: int,
     n_paths: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute variance and spot paths given the Volterra driver Y."""
+    """Compute variance and spot paths given the Volterra driver Y.
+
+    Dispatches to the JAX lax.scan kernel when JAX is available, otherwise
+    falls back to the NumPy loop.
+    """
+    if _JAX_AVAILABLE:
+        var, S = _jax_var_and_spot(
+            jnp.asarray(Y), jnp.asarray(xi_curve), jnp.asarray(t),
+            jnp.asarray(dt), jnp.asarray(dW_s),
+            float(H), float(eta), float(S0), float(r), float(q),
+        )
+        return np.asarray(var), np.asarray(S)
+
+    # NumPy fallback
     n_times = n_steps + 1
     var = np.empty((n_paths, n_times), dtype=float)
     var[:, 0] = xi_curve[0]

@@ -132,20 +132,20 @@ def _draw_panel(
     for ax in axes_flat[len(tickers[:9]):]:
         ax.set_visible(False)
 
+    fig.suptitle(
+        f"Short-Term Calibration Panel\nSnapshot: {snapshot.snapshot_date}",
+        fontsize=16,
+        y=1.0,
+    )
     fig.legend(
         handles=build_legend_handles(),
         loc="upper center",
         ncol=6,
         frameon=False,
-        bbox_to_anchor=(0.5, 0.985),
+        bbox_to_anchor=(0.5, 0.955),
         fontsize=10,
     )
-    fig.suptitle(
-        f"Short-Term Calibration Panel\nSnapshot: {snapshot.snapshot_date}",
-        fontsize=16,
-        y=0.995,
-    )
-    fig.tight_layout(rect=(0.02, 0.02, 0.98, 0.93))
+    fig.tight_layout(rect=(0.02, 0.02, 0.98, 0.91))
     return fig, axes_flat
 
 

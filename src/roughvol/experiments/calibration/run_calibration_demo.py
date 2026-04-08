@@ -33,7 +33,7 @@ from roughvol.calibration.calibration import (
     make_rough_bergomi_calibrator,
     make_rough_heston_calibrator,
 )
-from roughvol.data.yfinance_loader import get_market_data, get_option_surface
+from roughvol.data.yfinance_loader import get_market_data, get_option_surface, select_otm_option_side
 from roughvol.engines.mc import MonteCarloEngine
 from roughvol.instruments.vanilla import VanillaOption
 from roughvol.models.GBM_model import GBM_Model
@@ -329,6 +329,7 @@ def build_model_from_params(model_name: str, params: dict[str, float]) -> object
             rho=params["rho"],
             v0=params["v0"],
             scheme="markovian-lift",
+            n_factors=8,  # NNLS plateau; BB only wins at N≥32 which is too slow for calibration
         )
     raise ValueError(f"Unknown model: {model_name}")
 
@@ -347,7 +348,14 @@ def compute_model_iv_smile(
     ivs: list[float | None] = []
 
     for strike in strikes:
-        instrument = VanillaOption(strike=strike, maturity=maturity, is_call=True)
+        is_call = select_otm_option_side(
+            strike=strike,
+            spot=market_data.spot,
+            maturity=maturity,
+            rate=market_data.rate,
+            div=market_data.div_yield,
+        )
+        instrument = VanillaOption(strike=strike, maturity=maturity, is_call=is_call)
         try:
             price_result = engine.price(model=model, instrument=instrument, market=market_data)
             iv = implied_vol(
@@ -357,7 +365,7 @@ def compute_model_iv_smile(
                 maturity=maturity,
                 rate=market_data.rate,
                 div=market_data.div_yield,
-                is_call=True,
+                is_call=is_call,
             )
         except (ValueError, Exception):
             iv = None

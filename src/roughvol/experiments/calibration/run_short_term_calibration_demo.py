@@ -33,7 +33,11 @@ from roughvol.calibration.calibration import (
     make_rough_bergomi_calibrator,
     make_rough_heston_calibrator,
 )
-from roughvol.data.yfinance_loader import get_market_data, get_option_surface
+from roughvol.data.yfinance_loader import (
+    get_market_data,
+    get_option_surface,
+    select_otm_option_side,
+)
 from roughvol.engines.mc import MonteCarloEngine
 from roughvol.experiments._paths import output_dir, output_path
 from roughvol.experiments.calibration.run_calibration_demo import (
@@ -71,8 +75,8 @@ SHORT_TERM_MONEYNESS = 0.20
 SHORT_TERM_RELAXED_MONEYNESS = 0.30
 TARGET_SMILE_DAYS = 30
 RB_SCHEME = "blp-hybrid"
-RH_SCHEME = "bayer-breneis"
-RH_N_FACTORS = 8
+RH_SCHEME = "markovian-lift"   # BB overtakes NNLS only at N≥32; N=8 BB is worse
+RH_N_FACTORS = 8               # factor floor (~0.34) is comparable to MC noise at 2K paths
 MODEL_NAMES = ("GBM", "Heston", "RoughBergomi", "RoughHeston")
 DEFAULT_MONEYNESS_GRID = [round(value, 4) for value in np.linspace(0.80, 1.20, 11)]
 DEFAULT_CACHE_PATH = output_path("calibration", "short_term_calibration_cache.json")
@@ -382,7 +386,14 @@ def compute_model_iv_smile(
     ivs: list[float | None] = []
 
     for strike in strikes:
-        instrument = VanillaOption(strike=strike, maturity=maturity, is_call=True)
+        is_call = select_otm_option_side(
+            strike=strike,
+            spot=market_data.spot,
+            maturity=maturity,
+            rate=market_data.rate,
+            div=market_data.div_yield,
+        )
+        instrument = VanillaOption(strike=strike, maturity=maturity, is_call=is_call)
         try:
             price_result = engine.price(model=model, instrument=instrument, market=market_data)
             iv = implied_vol(
@@ -392,7 +403,7 @@ def compute_model_iv_smile(
                 maturity=maturity,
                 rate=market_data.rate,
                 div=market_data.div_yield,
-                is_call=True,
+                is_call=is_call,
             )
         except (ValueError, Exception):
             iv = None

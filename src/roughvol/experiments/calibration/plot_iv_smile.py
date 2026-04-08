@@ -65,7 +65,7 @@ def plot_iv_smiles(
             zorder=5,
         )
 
-        fine_moneyness = np.linspace(0.80, 1.20, 10)
+        fine_moneyness = np.linspace(0.80, 1.20, 41)
         fine_strikes = (fine_moneyness * spot).tolist()
 
         for model_name in ("GBM", "Heston", "RoughBergomi", "RoughHeston"):

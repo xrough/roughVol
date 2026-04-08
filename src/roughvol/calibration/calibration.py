@@ -351,18 +351,18 @@ def make_rough_heston_calibrator(
     x0: list[float] | None = None,
     engine_kwargs: dict | None = None,
     scheme: str = "markovian-lift",
-    n_factors: int = 8,
+    n_factors: int = 8,   # NNLS plateau by N=8; increase to 32 + bayer-breneis for high-accuracy pricing
 ) -> MCCalibrator:
     """MCCalibrator for RoughHestonModel (6 params: hurst, lam, theta, nu, rho, v0).
 
     Parameters
     ----------
     scheme : simulation scheme used during optimisation.
-        "markovian-lift"  — O(N·n), N-factor exponential integrator; converges to
-                            the correct price; default.
+        "markovian-lift"  — O(N·n), N-factor exponential integrator (NNLS weights);
+                            best at small N (≤16); default.
         "volterra-euler"  — O(n²), direct Volterra history; correct but slow.
-        "bayer-breneis"   — NOTE: current implementation has asymptotic bias;
-                            do not use for calibration until corrected.
+        "bayer-breneis"   — O(N·n), GH5 innovations + spectral BB weights; overtakes
+                            markovian-lift in accuracy at N≥32 but slower per step.
     n_factors : number of Markovian lift factors; ignored for "volterra-euler".
     """
     from roughvol.models.rough_heston_model import RoughHestonModel
