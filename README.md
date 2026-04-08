@@ -56,23 +56,3 @@ Static single-maturity calibration is therefore the wrong test. The meaningful b
 ### Empirical roughness
 
 The roughness estimation pipeline fits H from the scaling law of realized variance across non-overlapping blocks, using intraday 1-minute data with session-aware gap exclusion. A key open question is whether the empirically estimated H agrees with the H calibrated from the option surface — they often diverge, and that tension is practically important for model selection.
-
-## Setup
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install numpy scipy pandas matplotlib jax[cpu]
-pip install yfinance          # required for live-data experiments
-```
-
-## Experiments
-
-Each experiment is a module under `roughvol.experiments.<purpose>`. Run the workflow script to fetch/compute data, then any `plot_*` script to render a figure into `output/<purpose>/`.
-
-| Experiment | Module | What it measures |
-|---|---|---|
-| Calibration | `roughvol.experiments.calibration` | IV-RMSE across models on live option surfaces |
-| Short-term panel | `roughvol.experiments.calibration.plot_short_term_panel` | 3×3 smile panel, 14–45D expiries, cached daily snapshots |
-| Convergence | `roughvol.experiments.convergence` | Pricing error vs wall-clock time per scheme and H |
-| Rough estimate | `roughvol.experiments.rough_estimate` | Empirical H from realized variance scaling; ATM term structure |
