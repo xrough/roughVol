@@ -71,3 +71,8 @@ Thumbs.db
 data/
 outputs/
 results/
+
+# =========================
+# Experiment cache files
+# =========================
+output/**/*_cache*.json

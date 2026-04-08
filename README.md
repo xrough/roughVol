@@ -139,8 +139,6 @@ The one-plot scripts render one figure each, and the ensemble pipeline renders t
 python -m roughvol.experiments.convergence.run_rough_vol
 python -m roughvol.experiments.convergence.plot_error
 python -m roughvol.experiments.convergence.plot_timing
-python -m roughvol.experiments.convergence.plot_error_rh
-python -m roughvol.experiments.convergence.plot_timing_rh
 python -m roughvol.experiments.convergence.plot_efficiency_rh
 python -m roughvol.experiments.ensemble.run_convergence_pipeline
 ```
@@ -149,8 +147,6 @@ Outputs:
 
 - `output/convergence/rough_vol_error.png`
 - `output/convergence/rough_vol_timing.png`
-- `output/convergence/rough_heston_error.png`
-- `output/convergence/rough_heston_timing.png`
 - `output/convergence/rough_heston_efficiency.png`
 
 #### Scheme efficiency: accuracy vs wall-clock time
